@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "cardUid": "mc1-fixture-card",
+  "groups": [
+    {
+      "groupId": "rain-stop",
+      "title": "雨停之前",
+      "memberRoleIds": ["role-cheng", "role-sun", "role-user"],
+      "messages": [
+        {
+          "messageId": "fixture-001",
+          "authorRoleId": "role-cheng",
+          "content": "屋檐的水声变慢了。再等五分钟？",
+          "createdAt": "2026-07-25T09:37:00+08:00"
+        },
+        {
+          "messageId": "fixture-002",
+          "authorRoleId": "role-sun",
+          "content": "我去把车挪近。谁都别淋着。",
+          "createdAt": "2026-07-25T09:38:00+08:00"
+        }
+      ]
+    }
+  ]
+}

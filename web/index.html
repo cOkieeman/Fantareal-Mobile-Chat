@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="amber">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'none'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="color-scheme" content="dark light" />
+    <title>小手机 · MC1</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="stage" aria-label="小手机 MC1 静态预览">
+      <aside class="brief" aria-labelledby="brief-title">
+        <p class="overline">FANTAREAL / FIELD TERMINAL 01</p>
+        <h1 id="brief-title">把角色世界，装进一台随身终端。</h1>
+        <p class="brief-copy">
+          这是 MC1 的离线界面契约，不读取角色卡、聊天记录或模型配置。真实群聊将在后续阶段接入 Host Context、LLM 与 per-card storage。
+        </p>
+        <dl class="contract-list">
+          <div>
+            <dt>HOST</dt>
+            <dd>API 1.1</dd>
+          </div>
+          <div>
+            <dt>NETWORK</dt>
+            <dd>OFFLINE</dd>
+          </div>
+          <div>
+            <dt>PERMISSIONS</dt>
+            <dd>NONE</dd>
+          </div>
+        </dl>
+        <p class="phase-note">MC1 · SHELL / SCHEMA / FIXTURE</p>
+      </aside>
+
+      <section class="device" aria-label="小手机界面">
+        <div class="device-rail" aria-hidden="true"></div>
+        <header class="status-bar">
+          <span id="clock">09:41</span>
+          <span class="signal">OFFLINE · MC1</span>
+          <button id="theme-toggle" class="icon-button" type="button" aria-label="切换配色">◐</button>
+        </header>
+
+        <section id="home-screen" class="screen is-active" data-screen="home" aria-labelledby="home-title">
+          <header class="screen-heading">
+            <div>
+              <p class="eyebrow">SATURDAY / LOCAL PREVIEW</p>
+              <h2 id="home-title">小手机</h2>
+            </div>
+            <span class="avatar" aria-label="测试角色占位符">R</span>
+          </header>
+
+          <button class="feature-card" type="button" data-open-screen="chat">
+            <span class="feature-index">01</span>
+            <span>
+              <strong>口袋群聊</strong>
+              <small>3 位角色 · 静态对话 fixture</small>
+            </span>
+            <span class="feature-arrow" aria-hidden="true">↗</span>
+          </button>
+
+          <nav class="app-grid" aria-label="轻应用预览">
+            <button type="button" data-open-screen="chat"><span>聊</span>群聊</button>
+            <button type="button" disabled><span>动</span>动态</button>
+            <button type="button" disabled><span>坛</span>论坛</button>
+            <button type="button" disabled><span>邮</span>邮箱</button>
+            <button type="button" disabled><span>记</span>日记</button>
+            <button type="button" disabled><span>历</span>日程</button>
+          </nav>
+
+          <div class="boundary-note" role="note">
+            <span aria-hidden="true">!</span>
+            <p><strong>静态预览</strong> 当前不会发起模型请求，也不会写入本地数据。</p>
+          </div>
+        </section>
+
+        <section id="chat-screen" class="screen" data-screen="chat" aria-labelledby="chat-title" hidden>
+          <header class="chat-header">
+            <button class="icon-button" type="button" data-open-screen="home" aria-label="返回主页">←</button>
+            <div>
+              <p>POCKET GROUP / FIXTURE</p>
+              <h2 id="chat-title">雨停之前</h2>
+            </div>
+            <span class="member-count">3</span>
+          </header>
+
+          <ol class="message-list" aria-label="静态对话示例">
+            <li class="message incoming">
+              <span class="message-author">澄</span>
+              <p>屋檐的水声变慢了。再等五分钟？</p>
+              <time>09:37</time>
+            </li>
+            <li class="message incoming accent">
+              <span class="message-author">隼</span>
+              <p>我去把车挪近。谁都别淋着。</p>
+              <time>09:38</time>
+            </li>
+            <li class="message outgoing">
+              <span class="message-author">你</span>
+              <p>好。回来时顺便看看巷口的灯还亮不亮。</p>
+              <time>09:39</time>
+            </li>
+          </ol>
+
+          <div class="composer" aria-label="不可用的消息输入预览">
+            <span>MC4 接入后可发送消息</span>
+            <button type="button" disabled aria-label="发送不可用">↑</button>
+          </div>
+        </section>
+
+        <footer class="device-footer">
+          <span id="fixture-status" role="status">离线 fixture 已就绪</span>
+          <button id="close-extension" type="button">关闭预览</button>
+        </footer>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

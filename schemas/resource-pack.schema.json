@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fantareal.dev/schemas/mobile-chat-resource-pack.schema.json",
+  "title": "Fantareal Mobile Chat resource pack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name", "version", "assets"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "description": { "type": "string", "maxLength": 500 },
+    "assets": {
+      "type": "array",
+      "maxItems": 4000,
+      "items": { "$ref": "#/$defs/asset" }
+    }
+  },
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "path", "mediaType"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+        },
+        "kind": { "enum": ["sticker", "background", "avatar-decoration"] },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9._/-]+$"
+        },
+        "mediaType": { "enum": ["image/png", "image/jpeg", "image/webp", "image/gif"] },
+        "alt": { "type": "string", "maxLength": 120 }
+      }
+    }
+  }
+}

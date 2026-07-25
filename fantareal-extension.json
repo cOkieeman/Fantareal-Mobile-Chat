@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "com.fantareal.mobile-chat",
+  "name": "小手机",
+  "description": "角色社交与轻应用空间。MC1 仅提供离线静态界面与数据契约预览。",
+  "version": "0.1.0-dev.1",
+  "publisher": "cOkieeman",
+  "compatibility": {
+    "hostApi": ">=1.1.0 <2.0.0"
+  },
+  "entrypoints": {
+    "page": {
+      "type": "web",
+      "path": "web/index.html",
+      "bridge": "fantareal.extension.v1"
+    }
+  },
+  "contributes": {
+    "pages": [
+      {
+        "id": "mobile-chat",
+        "title": "小手机",
+        "description": "打开角色社交与轻应用空间的 MC1 离线预览。",
+        "icon": "message"
+      }
+    ],
+    "commands": [
+      {
+        "id": "mobile-chat.open",
+        "title": "打开小手机",
+        "handler": {
+          "type": "page.open",
+          "page": "mobile-chat"
+        }
+      }
+    ]
+  },
+  "permissions": []
+}
