@@ -1,123 +1,327 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="amber">
+<html lang="zh-CN" data-theme="midnight" data-presentation="compact" data-chat-view="groups">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'none'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; style-src 'self' fantareal-extension:; script-src 'self' fantareal-extension:; img-src 'self' fantareal-extension: data:; connect-src 'none'; font-src 'self' fantareal-extension:; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <meta name="color-scheme" content="dark light" />
-    <title>小手机 · MC1</title>
+    <meta name="description" content="Fantareal 小手机 MC4 口袋群聊" />
+    <title>小手机 · 口袋群聊</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="stage" aria-label="小手机 MC1 静态预览">
+    <main class="stage" aria-label="Fantareal 小手机">
       <aside class="brief" aria-labelledby="brief-title">
-        <p class="overline">FANTAREAL / FIELD TERMINAL 01</p>
-        <h1 id="brief-title">把角色世界，装进一台随身终端。</h1>
+        <p class="overline">FANTAREAL / MOBILE CHAT 04</p>
+        <h1 id="brief-title">熟悉的小手机，已经接上真实角色与模型。</h1>
         <p class="brief-copy">
-          这是 MC1 的离线界面契约，不读取角色卡、聊天记录或模型配置。真实群聊将在后续阶段接入 Host Context、LLM 与 per-card storage。
+          群聊数据按当前角色隔离，模型请求由 Fantareal Host 统一管理。插件不会读取 API Key，也不会启动独立网络服务。
         </p>
         <dl class="contract-list">
           <div>
             <dt>HOST</dt>
-            <dd>API 1.1</dd>
+            <dd>API 1.2</dd>
           </div>
           <div>
-            <dt>NETWORK</dt>
-            <dd>OFFLINE</dd>
+            <dt>MODEL</dt>
+            <dd>MANAGED</dd>
           </div>
           <div>
-            <dt>PERMISSIONS</dt>
-            <dd>NONE</dd>
+            <dt>STORAGE</dt>
+            <dd>PER CARD</dd>
           </div>
         </dl>
-        <p class="phase-note">MC1 · SHELL / SCHEMA / FIXTURE</p>
+        <p class="phase-note">MC4 · GROUP CHAT / CONTEXT BOUND</p>
       </aside>
 
       <section class="device" aria-label="小手机界面">
-        <div class="device-rail" aria-hidden="true"></div>
-        <header class="status-bar">
-          <span id="clock">09:41</span>
-          <span class="signal">OFFLINE · MC1</span>
-          <button id="theme-toggle" class="icon-button" type="button" aria-label="切换配色">◐</button>
+        <header class="status-bar" aria-label="手机状态">
+          <time id="clock">09:41</time>
+          <div class="phone-status" aria-hidden="true">
+            <span class="silent-indicator"></span>
+            <span class="wifi-indicator"></span>
+            <span class="network-indicator">5G</span>
+            <span class="signal-indicator"><i></i><i></i><i></i></span>
+            <span class="battery-indicator"><i></i></span>
+          </div>
         </header>
 
-        <section id="home-screen" class="screen is-active" data-screen="home" aria-labelledby="home-title">
-          <header class="screen-heading">
+        <header class="device-header">
+          <div class="device-identity">
+            <span class="device-mark" aria-hidden="true">F</span>
             <div>
-              <p class="eyebrow">SATURDAY / LOCAL PREVIEW</p>
-              <h2 id="home-title">小手机</h2>
+              <strong>小手机</strong>
+              <span id="identity-subtitle">正在连接当前角色…</span>
             </div>
-            <span class="avatar" aria-label="测试角色占位符">R</span>
-          </header>
+          </div>
+          <div class="header-actions">
+            <button
+              id="presentation-toggle"
+              class="mode-button"
+              type="button"
+              aria-controls="device-body"
+              aria-pressed="false"
+            >
+              <span aria-hidden="true">↔</span>
+              <span id="presentation-label">展开</span>
+            </button>
+            <button id="theme-toggle" class="icon-button" type="button" aria-label="切换为浅色主题" aria-pressed="false">◐</button>
+            <button id="close-extension" class="icon-button" type="button" aria-label="关闭小手机">×</button>
+          </div>
+        </header>
 
-          <button class="feature-card" type="button" data-open-screen="chat">
-            <span class="feature-index">01</span>
-            <span>
-              <strong>口袋群聊</strong>
-              <small>3 位角色 · 静态对话 fixture</small>
-            </span>
-            <span class="feature-arrow" aria-hidden="true">↗</span>
-          </button>
-
-          <nav class="app-grid" aria-label="轻应用预览">
-            <button type="button" data-open-screen="chat"><span>聊</span>群聊</button>
-            <button type="button" disabled><span>动</span>动态</button>
-            <button type="button" disabled><span>坛</span>论坛</button>
-            <button type="button" disabled><span>邮</span>邮箱</button>
-            <button type="button" disabled><span>记</span>日记</button>
-            <button type="button" disabled><span>历</span>日程</button>
+        <div id="device-body" class="device-body">
+          <nav id="app-navigation" class="app-navigation" aria-label="小手机常用导航">
+            <p class="navigation-label">常用应用</p>
+            <button type="button" data-open-screen="chat">
+              <span class="navigation-icon" aria-hidden="true">聊</span>
+              <span>群聊</span>
+            </button>
+            <button type="button" data-open-screen="home" aria-current="page">
+              <span class="navigation-icon" aria-hidden="true">应</span>
+              <span>应用</span>
+            </button>
+            <button type="button" disabled>
+              <span class="navigation-icon" aria-hidden="true">贴</span>
+              <span>表情</span>
+            </button>
+            <button type="button" disabled>
+              <span class="navigation-icon" aria-hidden="true">设</span>
+              <span>设置</span>
+            </button>
+            <small>更多入口将在后续里程碑逐步启用。</small>
           </nav>
 
-          <div class="boundary-note" role="note">
-            <span aria-hidden="true">!</span>
-            <p><strong>静态预览</strong> 当前不会发起模型请求，也不会写入本地数据。</p>
+          <div class="screen-stack">
+            <section id="home-screen" class="screen home-screen is-active" data-screen="home" aria-labelledby="home-title">
+              <section class="home-hero" aria-label="本地桌面信息">
+                <div class="home-time-stack">
+                  <time id="home-clock" class="home-time">09:41</time>
+                  <p><strong>今日运势 · 宜慢一点</strong><span>雨会停，未说完的话可以稍后再说。</span></p>
+                </div>
+                <div class="weather">
+                  <span class="weather-icon" aria-hidden="true">☂</span>
+                  <p><strong>阵雨</strong><span>18° / 22°</span></p>
+                </div>
+              </section>
+
+              <div class="section-heading">
+                <h2 id="home-title" tabindex="-1">全部应用</h2>
+                <span>1 项可用</span>
+              </div>
+
+              <nav class="app-grid" aria-label="轻应用">
+                <button type="button" data-open-screen="chat">
+                  <span class="app-icon app-icon-chat" aria-hidden="true">聊</span>
+                  <strong>群聊</strong>
+                </button>
+                <button type="button" disabled>
+                  <span class="app-icon app-icon-feed" aria-hidden="true">动</span>
+                  <strong>动态</strong>
+                </button>
+                <button type="button" disabled>
+                  <span class="app-icon app-icon-forum" aria-hidden="true">坛</span>
+                  <strong>论坛</strong>
+                </button>
+                <button type="button" disabled>
+                  <span class="app-icon app-icon-sticker" aria-hidden="true">贴</span>
+                  <strong>表情</strong>
+                </button>
+                <button type="button" disabled>
+                  <span class="app-icon app-icon-mail" aria-hidden="true">邮</span>
+                  <strong>邮箱</strong>
+                </button>
+                <button type="button" disabled>
+                  <span class="app-icon app-icon-diary" aria-hidden="true">记</span>
+                  <strong>日记</strong>
+                </button>
+                <button type="button" disabled>
+                  <span class="app-icon app-icon-calendar" aria-hidden="true">历</span>
+                  <strong>日程</strong>
+                </button>
+                <button type="button" disabled>
+                  <span class="app-icon app-icon-settings" aria-hidden="true">设</span>
+                  <strong>设置</strong>
+                </button>
+              </nav>
+
+              <div id="home-boundary" class="boundary-note" role="note">
+                <span aria-hidden="true">i</span>
+                <p><strong>正在初始化</strong> 正在连接当前角色与受管数据服务。</p>
+              </div>
+            </section>
+
+            <section id="chat-screen" class="screen chat-screen" data-screen="chat" aria-label="口袋群聊" hidden>
+              <div class="chat-layout">
+                <aside id="group-panel" class="group-panel" aria-labelledby="group-panel-title">
+                  <header class="panel-header">
+                    <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                    <div>
+                      <h2 id="group-panel-title" tabindex="-1">口袋群聊</h2>
+                      <p id="group-count">正在载入群聊…</p>
+                    </div>
+                    <div class="panel-actions">
+                      <button id="import-groups" class="small-icon-button" type="button" aria-label="导入旧群聊" title="导入旧群聊">⇩</button>
+                      <button id="create-group" class="small-icon-button primary" type="button" aria-label="新建群聊" title="新建群聊">＋</button>
+                    </div>
+                  </header>
+
+                  <ul id="group-list" class="group-list" aria-label="群聊列表"></ul>
+                  <div id="group-empty" class="empty-state">
+                    <span aria-hidden="true">聊</span>
+                    <strong>还没有群聊</strong>
+                    <p>创建一个群聊，把当前角色加入成员后即可开始。</p>
+                    <button id="create-first-group" type="button">创建第一个群聊</button>
+                  </div>
+                </aside>
+
+                <section id="conversation-panel" class="conversation-panel" aria-labelledby="chat-title">
+                  <header class="chat-header">
+                    <button id="back-to-groups" class="back-button compact-only" type="button" aria-label="返回群聊列表">←</button>
+                    <div>
+                      <h2 id="chat-title" tabindex="-1">选择一个群聊</h2>
+                      <p id="chat-members"><span class="online-dot" aria-hidden="true"></span>等待群聊</p>
+                    </div>
+                    <div class="panel-actions">
+                      <button id="clear-messages" class="small-icon-button" type="button" aria-label="清空消息" title="清空消息">⌫</button>
+                      <button id="edit-group" class="small-icon-button" type="button" aria-label="编辑群聊" title="编辑群聊">•••</button>
+                    </div>
+                  </header>
+
+                  <ol id="message-list" class="message-list" aria-label="群聊消息"></ol>
+                  <div id="message-empty" class="empty-state message-empty">
+                    <span aria-hidden="true">✦</span>
+                    <strong>对话从这里开始</strong>
+                    <p>发送一条消息，或让角色基于当前群聊自然续聊。</p>
+                  </div>
+
+                  <div id="generation-state" class="generation-state" role="status" aria-live="polite" hidden>
+                    <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span id="generation-label">角色正在回复…</span>
+                    <button id="retry-generation" type="button" hidden>重试</button>
+                  </div>
+
+                  <form id="composer-form" class="composer">
+                    <button id="continue-chat" class="continue-button" type="button" aria-label="让角色继续聊天" title="角色续聊">✦</button>
+                    <label class="sr-only" for="message-input">输入群聊消息</label>
+                    <textarea id="message-input" rows="1" maxlength="500" placeholder="说点什么…" enterkeyhint="send"></textarea>
+                    <button id="send-message" class="send-button" type="submit" aria-label="发送消息">↑</button>
+                    <button id="stop-generation" class="stop-button" type="button" aria-label="停止生成" hidden>■</button>
+                  </form>
+                </section>
+              </div>
+            </section>
           </div>
-        </section>
-
-        <section id="chat-screen" class="screen" data-screen="chat" aria-labelledby="chat-title" hidden>
-          <header class="chat-header">
-            <button class="icon-button" type="button" data-open-screen="home" aria-label="返回主页">←</button>
-            <div>
-              <p>POCKET GROUP / FIXTURE</p>
-              <h2 id="chat-title">雨停之前</h2>
-            </div>
-            <span class="member-count">3</span>
-          </header>
-
-          <ol class="message-list" aria-label="静态对话示例">
-            <li class="message incoming">
-              <span class="message-author">澄</span>
-              <p>屋檐的水声变慢了。再等五分钟？</p>
-              <time>09:37</time>
-            </li>
-            <li class="message incoming accent">
-              <span class="message-author">隼</span>
-              <p>我去把车挪近。谁都别淋着。</p>
-              <time>09:38</time>
-            </li>
-            <li class="message outgoing">
-              <span class="message-author">你</span>
-              <p>好。回来时顺便看看巷口的灯还亮不亮。</p>
-              <time>09:39</time>
-            </li>
-          </ol>
-
-          <div class="composer" aria-label="不可用的消息输入预览">
-            <span>MC4 接入后可发送消息</span>
-            <button type="button" disabled aria-label="发送不可用">↑</button>
-          </div>
-        </section>
+        </div>
 
         <footer class="device-footer">
-          <span id="fixture-status" role="status">离线 fixture 已就绪</span>
-          <button id="close-extension" type="button">关闭预览</button>
+          <span id="fixture-status" role="status" aria-live="polite">正在连接 Fantareal Host…</span>
         </footer>
       </section>
     </main>
+
+    <dialog id="group-dialog" class="mobile-dialog">
+      <form id="group-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">GROUP PROFILE</p>
+            <h2 id="group-dialog-title">新建群聊</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="group-dialog" aria-label="关闭">×</button>
+        </header>
+
+        <label>
+          <span>群聊名称</span>
+          <input id="group-title-input" name="title" maxlength="80" required autocomplete="off" placeholder="例如：雨停之前" />
+        </label>
+        <label>
+          <span>群聊说明</span>
+          <textarea id="group-description-input" name="description" maxlength="500" rows="3" placeholder="这群人为什么聚在这里？"></textarea>
+        </label>
+
+        <fieldset>
+          <legend>角色成员</legend>
+          <p class="field-help">当前 Host 允许的角色会显示在这里；至少选择一名角色。</p>
+          <div id="member-options" class="member-options"></div>
+        </fieldset>
+
+        <div class="form-grid">
+          <label>
+            <span>单轮回复人数</span>
+            <select id="reply-count-input" name="replyCount">
+              <option value="1">1 位角色</option>
+              <option value="2" selected>最多 2 位角色</option>
+            </select>
+          </label>
+          <label class="check-field">
+            <input id="role-reply-input" name="allowRoleToRoleReply" type="checkbox" checked />
+            <span>允许角色彼此接话</span>
+          </label>
+        </div>
+
+        <p id="group-form-error" class="form-error" role="alert" hidden></p>
+        <footer>
+          <button id="delete-group" class="danger-button" type="button" hidden>删除群聊</button>
+          <span></span>
+          <button class="secondary-button" type="button" data-close-dialog="group-dialog">取消</button>
+          <button id="save-group" class="primary-button" type="submit">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="import-dialog" class="mobile-dialog">
+      <form id="import-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">LEGACY IMPORT</p>
+            <h2>确认导入旧群聊</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="import-dialog" aria-label="关闭">×</button>
+        </header>
+        <div id="import-summary" class="import-summary"></div>
+        <fieldset>
+          <legend>导入方式</legend>
+          <label class="radio-field">
+            <input type="radio" name="importMode" value="merge" checked />
+            <span><strong>合并</strong><small>保留现有群聊，并按稳定 ID 合并旧数据。</small></span>
+          </label>
+          <label class="radio-field">
+            <input type="radio" name="importMode" value="replace" />
+            <span><strong>替换</strong><small>删除当前角色现有群聊，再写入所选目录内容。</small></span>
+          </label>
+        </fieldset>
+        <p id="import-form-error" class="form-error" role="alert" hidden></p>
+        <footer>
+          <span></span>
+          <span></span>
+          <button class="secondary-button" type="button" data-close-dialog="import-dialog">取消</button>
+          <button class="primary-button" type="submit">确认导入</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="confirm-dialog" class="mobile-dialog confirm-dialog">
+      <form method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">CONFIRM ACTION</p>
+            <h2 id="confirm-title">确认操作</h2>
+          </div>
+        </header>
+        <p id="confirm-message"></p>
+        <footer>
+          <span></span>
+          <span></span>
+          <button id="confirm-cancel" class="secondary-button" value="cancel">取消</button>
+          <button id="confirm-accept" class="danger-button" value="confirm">确认</button>
+        </footer>
+      </form>
+    </dialog>
+
     <script src="app.js"></script>
   </body>
 </html>

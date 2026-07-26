@@ -4,7 +4,16 @@ import path from "node:path";
 import test from "node:test";
 
 const root = path.resolve(import.meta.dirname, "..");
-const ignoredDirectories = new Set([".git", "node_modules", "coverage", "dist", "build"]);
+const ignoredDirectories = new Set([
+  ".git",
+  ".venv",
+  ".build-audit",
+  "__pycache__",
+  "node_modules",
+  "coverage",
+  "dist",
+  "build",
+]);
 const forbiddenNames = new Set([".env", "settings.json", "conversations.json", "current_role_card.json"]);
 
 async function collectFiles(directory, result = []) {

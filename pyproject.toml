@@ -1,0 +1,29 @@
+[project]
+name = "fantareal-mobile-chat"
+version = "0.4.0.dev1"
+description = "Fantareal Mobile Chat Extension service"
+requires-python = ">=3.11,<3.12"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4,<10",
+    "ruff>=0.12,<1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+addopts = ["-q", "--strict-config", "--strict-markers"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF001"]

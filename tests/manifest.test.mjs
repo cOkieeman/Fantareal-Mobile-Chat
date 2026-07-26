@@ -6,29 +6,62 @@ import test from "node:test";
 const root = path.resolve(import.meta.dirname, "..");
 const manifestPath = path.join(root, "fantareal-extension.json");
 
-test("manifest matches the Host API 1.1 page contract", async () => {
+test("manifest matches the Host API 1.2 application-window contract", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
   assert.equal(manifest.schemaVersion, 1);
   assert.match(manifest.id, /^[a-z0-9]+(?:[.-][a-z0-9]+)+$/);
   assert.match(manifest.version, /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$/);
-  assert.equal(manifest.compatibility.hostApi, ">=1.1.0 <2.0.0");
-  assert.deepEqual(Object.keys(manifest.entrypoints).sort(), ["page"]);
+  assert.equal(manifest.compatibility.hostApi, ">=1.2.0 <2.0.0");
+  assert.deepEqual(Object.keys(manifest.entrypoints).sort(), ["page", "service"]);
   assert.equal(manifest.entrypoints.page.type, "web");
   assert.equal(manifest.entrypoints.page.bridge, "fantareal.extension.v1");
-  assert.deepEqual(manifest.permissions, []);
+  assert.deepEqual(manifest.entrypoints.service, {
+    type: "python",
+    module: "fantareal_mobile_chat.service",
+    protocol: "jsonrpc-2.0-stdio",
+    lockfile: "uv.lock",
+  });
+  assert.deepEqual(manifest.permissions, [
+    "storage.data",
+    "files.user-selected.directory-read",
+    "character.context.read",
+    "llm.generate",
+  ]);
 
   const page = manifest.contributes.pages.at(0);
   const command = manifest.contributes.commands.at(0);
   assert.equal(page.id, "mobile-chat");
+  assert.deepEqual(page.launcher, { surface: "applications", order: 100 });
+  assert.equal(page.presentation.kind, "window");
+  assert.equal(page.presentation.defaultMode, "compact");
+  assert.deepEqual(
+    page.presentation.modes.map(({ id, width, height, minWidth, minHeight, maxWidth, maxHeight }) => ({
+      id,
+      width,
+      height,
+      minWidth,
+      minHeight,
+      maxWidth,
+      maxHeight,
+    })),
+    [
+      { id: "compact", width: 390, height: 700, minWidth: 360, minHeight: 620, maxWidth: 440, maxHeight: 820 },
+      { id: "expanded", width: 760, height: 720, minWidth: 680, minHeight: 620, maxWidth: 960, maxHeight: 860 },
+    ],
+  );
   assert.deepEqual(command.handler, { type: "page.open", page: page.id });
   await access(path.join(root, manifest.entrypoints.page.path));
+  await access(path.join(root, manifest.entrypoints.service.lockfile));
 });
-test("manifest intentionally exposes no service or MC-specific Host capability", async () => {
+test("manifest requests only the generic capabilities needed by MC3 and MC4", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const serialized = JSON.stringify(manifest);
 
-  assert.equal(manifest.entrypoints.service, undefined);
-  assert.doesNotMatch(serialized, /background\.jobs|character\.context\.read/);
+  assert.doesNotMatch(serialized, /background\.jobs/);
+  assert.match(serialized, /storage\.data/);
+  assert.match(serialized, /files\.user-selected\.directory-read/);
+  assert.match(serialized, /character\.context\.read/);
+  assert.match(serialized, /llm\.generate/);
   assert.doesNotMatch(serialized, /FastAPI|mobile-chat-window/i);
 });
