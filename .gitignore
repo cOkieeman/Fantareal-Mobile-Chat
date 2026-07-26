@@ -3,6 +3,8 @@ Thumbs.db
 .idea/
 .vscode/
 node_modules/
+.venv/
+.build-audit/
 coverage/
 dist/
 build/

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fantareal.local/schemas/mobile-chat/message.schema.json",
+  "title": "Fantareal Mobile Chat Message",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "messageId",
+    "speakerId",
+    "speakerName",
+    "type",
+    "content",
+    "createdAt",
+    "source"
+  ],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$"
+    },
+    "speakerId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$"
+    },
+    "speakerName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "type": {
+      "enum": ["text", "error"]
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16384
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "enum": ["user", "ai", "system", "import"]
+    }
+  }
+}

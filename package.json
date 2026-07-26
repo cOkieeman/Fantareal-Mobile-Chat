@@ -1,9 +1,9 @@
 {
   "name": "fantareal-mobile-chat",
-  "version": "0.1.0-dev.1",
+  "version": "0.4.0-dev.1",
   "private": true,
   "type": "module",
-  "description": "MC1 shell for the Fantareal Mobile Chat extension",
+  "description": "Fantareal Mobile Chat extension and per-card JSON-RPC service",
   "scripts": {
     "check": "node --check web/app.js",
     "test": "node --test tests/*.test.mjs"
