@@ -90,7 +90,7 @@ class MobileChatService:
             return {
                 "ok": self.store is not None,
                 "service": "fantareal-mobile-chat",
-                "version": "0.8.0.dev1",
+                "version": "0.9.0rc1",
             }
         if method == "extension.shutdown":
             self.pending.clear()

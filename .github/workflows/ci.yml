@@ -3,6 +3,7 @@ name: Mobile Chat checks
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -25,6 +26,16 @@ jobs:
       - run: uv run --locked ruff check .
       - run: uv run --locked pytest
       - run: uv build --wheel --out-dir dist
+      - run: uv run --locked python tools/build_release.py --output-dir dist
       - run: uv venv .smoke-venv --python 3.11
       - run: uv pip install --python .smoke-venv/bin/python dist/*.whl
       - run: .smoke-venv/bin/python -I -X utf8 tests/stdio_smoke.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fantareal-Mobile-Chat-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/*.whl
+            dist/*.zip
+            dist/*.sha256

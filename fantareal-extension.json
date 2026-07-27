@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "com.fantareal.mobile-chat",
   "name": "小手机",
-  "description": "角色社交与轻应用空间。MC8 提供按角色隔离的轻应用、受管自动活动与用户资源包。",
-  "version": "0.8.0-dev.1",
+  "description": "角色社交与轻应用空间。MC9 RC 提供按角色隔离的轻应用、受管自动活动与用户资源包。",
+  "version": "0.9.0-rc.1",
   "publisher": "cOkieeman",
   "compatibility": {
     "hostApi": ">=1.3.0 <2.0.0"
