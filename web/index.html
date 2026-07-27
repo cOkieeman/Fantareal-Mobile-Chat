@@ -8,7 +8,7 @@
       content="default-src 'self'; style-src 'self' fantareal-extension:; script-src 'self' fantareal-extension:; img-src 'self' fantareal-extension: data:; connect-src 'none'; font-src 'self' fantareal-extension:; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <meta name="color-scheme" content="dark light" />
-    <meta name="description" content="Fantareal 小手机 MC5 角色社交与轻应用空间" />
+    <meta name="description" content="Fantareal 小手机 MC8 角色轻应用、受管自动活动与资源包空间" />
     <title>小手机 · 角色轻应用</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
@@ -16,15 +16,15 @@
   <body>
     <main class="stage" aria-label="Fantareal 小手机">
       <aside class="brief" aria-labelledby="brief-title">
-        <p class="overline">FANTAREAL / MOBILE CHAT 05</p>
-        <h1 id="brief-title">群聊之外，角色的动态、论坛与轻应用也留在这里。</h1>
+        <p class="overline">FANTAREAL / MOBILE CHAT 08</p>
+        <h1 id="brief-title">角色的聊天、轻应用与自有资源，都留在这台小手机里。</h1>
         <p class="brief-copy">
           群聊数据按当前角色隔离，模型请求由 Fantareal Host 统一管理。插件不会读取 API Key，也不会启动独立网络服务。
         </p>
         <dl class="contract-list">
           <div>
             <dt>HOST</dt>
-            <dd>API 1.2</dd>
+            <dd>API 1.3</dd>
           </div>
           <div>
             <dt>MODEL</dt>
@@ -35,7 +35,7 @@
             <dd>PER CARD</dd>
           </div>
         </dl>
-        <p class="phase-note">MC6 · INTERACTIVE APPS / PROMPT WORKBENCH</p>
+        <p class="phase-note">MC8 · USER-OWNED RESOURCE PACKS</p>
       </aside>
 
       <section class="device" aria-label="小手机界面">
@@ -111,7 +111,7 @@
 
               <div class="section-heading">
                 <h2 id="home-title" tabindex="-1">全部应用</h2>
-                <span>11 项可用</span>
+                <span>13 项可用</span>
               </div>
 
               <nav class="app-grid" aria-label="轻应用">
@@ -127,9 +127,9 @@
                   <span class="app-icon app-icon-forum" aria-hidden="true">坛</span>
                   <strong>论坛</strong>
                 </button>
-                <button type="button" disabled>
+                <button type="button" data-open-screen="resources">
                   <span class="app-icon app-icon-sticker" aria-hidden="true">贴</span>
-                  <strong>表情</strong>
+                  <strong>资源</strong>
                 </button>
                 <button type="button" data-open-screen="mail">
                   <span class="app-icon app-icon-mail" aria-hidden="true">邮</span>
@@ -163,9 +163,9 @@
                   <span class="app-icon app-icon-workbench" aria-hidden="true">调</span>
                   <strong>Prompt</strong>
                 </button>
-                <button type="button" disabled>
+                <button type="button" data-open-screen="background">
                   <span class="app-icon app-icon-settings" aria-hidden="true">设</span>
-                  <strong>设置</strong>
+                  <strong>自动</strong>
                 </button>
               </nav>
 
@@ -471,6 +471,72 @@
               </div>
             </section>
 
+            <section id="background-screen" class="screen light-app-screen background-screen" data-screen="background" aria-labelledby="background-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>MANAGED AUTOMATION</p>
+                  <h2 id="background-title" tabindex="-1">自动活动</h2>
+                  <span id="background-job-count">等待角色 Context</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="refresh-background-jobs" class="small-icon-button" type="button" aria-label="刷新后台任务" title="刷新后台任务">↻</button>
+                </div>
+              </header>
+              <div class="background-toolbar">
+                <p id="background-job-summary">所有自动活动默认关闭，只在 Fantareal Host 运行期间执行。</p>
+                <div>
+                  <button id="pause-all-background-jobs" type="button">全部暂停</button>
+                  <button id="resume-all-background-jobs" type="button">全部启用</button>
+                </div>
+              </div>
+              <ul id="background-job-list" class="background-job-list" aria-label="受管后台任务"></ul>
+              <aside class="boundary-note background-boundary" role="note">
+                <span aria-hidden="true">i</span>
+                <p><strong>显式授权</strong> 关闭窗口不会取消已进入 Host 队列的任务；切换角色会暂停旧绑定，重新启用时才会绑定当前角色。</p>
+              </aside>
+            </section>
+
+            <section id="resources-screen" class="screen light-app-screen resources-screen" data-screen="resources" aria-labelledby="resources-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>USER-OWNED ASSETS</p>
+                  <h2 id="resources-title" tabindex="-1">角色资源</h2>
+                  <span id="resource-pack-count">等待角色 Context</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="refresh-resource-packs" class="small-icon-button" type="button" aria-label="刷新资源包" title="刷新资源包">↻</button>
+                  <button id="import-resource-pack" class="small-icon-button primary" type="button" aria-label="导入资源包" title="导入资源包">＋</button>
+                </div>
+              </header>
+
+              <div class="resource-toolbar background-toolbar">
+                <div class="resource-usage">
+                  <div>
+                    <strong>Assets quota</strong>
+                    <span id="resource-quota-copy">尚未读取</span>
+                  </div>
+                  <progress id="resource-quota-progress" max="1" value="0" aria-label="资源额度使用量"></progress>
+                </div>
+                <div>
+                  <button id="clear-resource-packs" type="button">清空当前角色</button>
+                </div>
+              </div>
+
+              <ul id="resource-pack-list" class="background-job-list resource-pack-list" aria-label="当前角色资源包"></ul>
+              <div id="resource-pack-empty" class="empty-state resource-empty">
+                <span aria-hidden="true">贴</span>
+                <strong>还没有角色资源</strong>
+                <p>选择一个包含 resource-pack.json 的本地目录，先预览授权与 quota，再确认导入。</p>
+                <button id="import-first-resource-pack" type="button">选择资源包</button>
+              </div>
+              <aside id="resource-boundary" class="boundary-note resource-boundary" role="note">
+                <span aria-hidden="true">i</span>
+                <p><strong>用户自有资源</strong> 资源按当前角色隔离；损坏的资源包不会影响文本聊天。</p>
+              </aside>
+            </section>
+
             <section id="diary-screen" class="screen light-app-screen" data-screen="diary" aria-labelledby="diary-title" hidden>
               <header class="light-app-header">
                 <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
@@ -622,6 +688,64 @@
           <span></span>
           <button class="secondary-button" type="button" data-close-dialog="import-dialog">取消</button>
           <button class="primary-button" type="submit">确认导入</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="resource-import-dialog" class="mobile-dialog resource-import-dialog">
+      <form id="resource-import-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">RESOURCE PACK PREVIEW</p>
+            <h2>确认导入角色资源</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="resource-import-dialog" aria-label="关闭">×</button>
+        </header>
+
+        <section class="resource-import-summary" aria-labelledby="resource-import-name">
+          <div>
+            <strong id="resource-import-name">等待预览</strong>
+            <span id="resource-import-version"></span>
+          </div>
+          <p id="resource-import-description"></p>
+          <small id="resource-import-directory"></small>
+          <div id="resource-import-kinds" class="resource-kind-list" aria-label="资源用途"></div>
+        </section>
+
+        <section class="resource-license" aria-labelledby="resource-license-title">
+          <h3 id="resource-license-title">授权与来源</h3>
+          <dl>
+            <div><dt>授权</dt><dd id="resource-license-name">—</dd></div>
+            <div><dt>来源</dt><dd id="resource-license-source">—</dd></div>
+            <div><dt>再分发</dt><dd id="resource-license-redistribution">—</dd></div>
+            <div><dt>署名</dt><dd id="resource-license-attribution">—</dd></div>
+            <div><dt>链接</dt><dd id="resource-license-url">—</dd></div>
+          </dl>
+        </section>
+
+        <section class="resource-import-quota" aria-labelledby="resource-import-quota-title">
+          <div>
+            <h3 id="resource-import-quota-title">导入后的 Assets quota</h3>
+            <strong id="resource-import-quota-copy">—</strong>
+          </div>
+          <progress id="resource-import-quota-progress" max="1" value="0" aria-label="导入后资源额度使用量"></progress>
+          <p id="resource-import-quota-note"></p>
+        </section>
+
+        <section class="resource-preview-section" aria-labelledby="resource-preview-title">
+          <div>
+            <h3 id="resource-preview-title">内容预览</h3>
+            <span id="resource-preview-count"></span>
+          </div>
+          <div id="resource-preview-grid" class="resource-preview-grid"></div>
+        </section>
+
+        <p id="resource-import-error" class="form-error" role="alert" hidden></p>
+        <footer>
+          <span></span>
+          <span></span>
+          <button class="secondary-button" type="button" data-close-dialog="resource-import-dialog">取消</button>
+          <button id="confirm-resource-import" class="primary-button" type="submit">确认导入</button>
         </footer>
       </form>
     </dialog>
@@ -918,6 +1042,8 @@
     <script src="social-apps.js"></script>
     <script src="mail-apps.js"></script>
     <script src="mc6-apps.js"></script>
+    <script src="background-jobs.js"></script>
+    <script src="resource-packs.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

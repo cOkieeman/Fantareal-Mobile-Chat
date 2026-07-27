@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-import os
 import re
-import tempfile
 from pathlib import Path
 from typing import Any
 
+from .directory_grants import resolve_directory_grant
 from .domain import (
     ContextRef,
     DomainError,
@@ -16,6 +15,7 @@ from .domain import (
     normalize_message,
     now_iso,
 )
+from .filesystem import atomic_write_json
 from .interactive_apps import (
     normalize_live_message,
     normalize_live_stream,
@@ -38,11 +38,6 @@ from .workbench import (
     normalize_character_draft,
     normalize_prompt_diagnostic,
     normalize_prompt_profile,
-)
-
-TOKEN_PATTERN = re.compile(
-    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
-    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
 
 
@@ -1097,20 +1092,7 @@ class MobileStore:
         return {"groupCount": len(imported_groups), "messageCount": imported_message_count}
 
     def _legacy_root(self, directory_token: str, card_uid: str) -> Path:
-        if not TOKEN_PATTERN.fullmatch(directory_token):
-            raise DomainError("invalid_grant", "directoryToken 格式无效")
-        grant_path = self.workspace_root / "input-directory-grants" / f"{directory_token}.json"
-        grant = self._read_json(grant_path, {})
-        if (
-            not isinstance(grant, dict)
-            or grant.get("kind") != "fantareal.directory-grant"
-            or grant.get("token") != directory_token
-            or grant.get("readOnly") is not True
-        ):
-            raise DomainError("invalid_grant", "目录授权不存在或无效")
-        selected = Path(str(grant.get("path", ""))).resolve()
-        if not selected.is_dir():
-            raise DomainError("invalid_grant", "授权目录已不可用")
+        selected = resolve_directory_grant(self.workspace_root, directory_token).root
         candidates = [
             selected / "cards" / card_uid,
             selected / card_uid,
@@ -1237,25 +1219,7 @@ class MobileStore:
         except (OSError, json.JSONDecodeError) as exc:
             raise DomainError("storage_corrupt", f"无法读取 {path.name}") from exc
 
-    @staticmethod
-    def _write_json(path: Path, value: Any) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            dir=path.parent,
-        )
-        temporary_path = Path(temporary_name)
-        try:
-            with os.fdopen(descriptor, "wb") as handle:
-                handle.write(encoded)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary_path, path)
-        except OSError as exc:
-            temporary_path.unlink(missing_ok=True)
-            raise DomainError("storage_write_failed", f"无法写入 {path.name}") from exc
+    _write_json = staticmethod(atomic_write_json)
 
     def _write_groups(self, card_uid: str, groups: list[dict[str, Any]]) -> None:
         self._write_json(self._groups_path(card_uid), {"schemaVersion": 1, "groups": groups})

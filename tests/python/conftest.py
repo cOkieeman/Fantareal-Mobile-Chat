@@ -29,8 +29,10 @@ def character(card_uid: str = "card_a", name: str = "Alice") -> dict[str, Any]:
 @pytest.fixture
 def service(tmp_path: Path) -> MobileChatService:
     data_root = tmp_path / "data"
+    assets_root = tmp_path / "assets"
     workspace_root = tmp_path / "workspace"
     data_root.mkdir()
+    assets_root.mkdir()
     workspace_root.mkdir()
     instance = MobileChatService()
     instance.dispatch(
@@ -38,10 +40,13 @@ def service(tmp_path: Path) -> MobileChatService:
         {
             "workspace": str(workspace_root),
             "locale": "zh-CN",
-            "permissions": ["storage.data"],
+            "permissions": ["storage.data", "storage.assets"],
             "storage": {
-                "paths": {"data": str(data_root)},
-                "quotas": {"data": 64 * 1024 * 1024},
+                "paths": {"data": str(data_root), "assets": str(assets_root)},
+                "quotas": {
+                    "data": 64 * 1024 * 1024,
+                    "assets": 64 * 1024 * 1024,
+                },
             },
         },
     )

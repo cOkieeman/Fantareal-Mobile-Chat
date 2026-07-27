@@ -6,13 +6,13 @@ import test from "node:test";
 const root = path.resolve(import.meta.dirname, "..");
 const manifestPath = path.join(root, "fantareal-extension.json");
 
-test("manifest matches the Host API 1.2 application-window contract", async () => {
+test("manifest matches the Host API 1.3 application-window contract", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
   assert.equal(manifest.schemaVersion, 1);
   assert.match(manifest.id, /^[a-z0-9]+(?:[.-][a-z0-9]+)+$/);
   assert.match(manifest.version, /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$/);
-  assert.equal(manifest.compatibility.hostApi, ">=1.2.0 <2.0.0");
+  assert.equal(manifest.compatibility.hostApi, ">=1.3.0 <2.0.0");
   assert.deepEqual(Object.keys(manifest.entrypoints).sort(), ["page", "service"]);
   assert.equal(manifest.entrypoints.page.type, "web");
   assert.equal(manifest.entrypoints.page.bridge, "fantareal.extension.v1");
@@ -24,9 +24,11 @@ test("manifest matches the Host API 1.2 application-window contract", async () =
   });
   assert.deepEqual(manifest.permissions, [
     "storage.data",
+    "storage.assets",
     "files.user-selected.directory-read",
     "character.context.read",
     "llm.generate",
+    "background.jobs",
   ]);
 
   const page = manifest.contributes.pages.at(0);
@@ -54,12 +56,13 @@ test("manifest matches the Host API 1.2 application-window contract", async () =
   await access(path.join(root, manifest.entrypoints.page.path));
   await access(path.join(root, manifest.entrypoints.service.lockfile));
 });
-test("manifest requests only the generic capabilities needed through MC6", async () => {
+test("manifest requests the generic capabilities needed through MC8", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const serialized = JSON.stringify(manifest);
 
-  assert.doesNotMatch(serialized, /background\.jobs/);
+  assert.match(serialized, /background\.jobs/);
   assert.match(serialized, /storage\.data/);
+  assert.match(serialized, /storage\.assets/);
   assert.match(serialized, /files\.user-selected\.directory-read/);
   assert.match(serialized, /character\.context\.read/);
   assert.match(serialized, /llm\.generate/);
