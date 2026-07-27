@@ -6,12 +6,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TextIO
 
+from .background_jobs import (
+    background_catalog,
+    background_execution,
+    background_spec,
+)
 from .domain import (
     ContextRef,
     DomainError,
     build_llm_request,
     mapping,
     new_id,
+    normalize_context,
     parse_llm_messages,
     system_error_message,
     text,
@@ -34,6 +40,7 @@ from .mail_apps import (
     parse_generated_mail_messages,
     parse_generated_mail_threads,
 )
+from .resource_packs import ResourcePackManager
 from .social_apps import (
     build_social_app_request,
     parse_generated_feed,
@@ -65,11 +72,14 @@ class PendingLightApp:
     context: ContextRef
     purpose: str
     payload: dict[str, Any] = field(default_factory=dict)
+    background_execution_id: str = ""
+    background_job_id: str = ""
 
 
 class MobileChatService:
     def __init__(self) -> None:
         self.store: MobileStore | None = None
+        self.resource_packs: ResourcePackManager | None = None
         self.locale = "zh-CN"
         self.pending: dict[str, PendingChat | PendingLightApp] = {}
 
@@ -80,10 +90,11 @@ class MobileChatService:
             return {
                 "ok": self.store is not None,
                 "service": "fantareal-mobile-chat",
-                "version": "0.6.0.dev1",
+                "version": "0.8.0.dev1",
             }
         if method == "extension.shutdown":
             self.pending.clear()
+            self.resource_packs = None
             return {"ok": True}
         store = self._store()
 
@@ -568,6 +579,56 @@ class MobileChatService:
             return {"updatedCount": store.mark_all_notifications_read(context)}
         if method == "mobile.notifications.clear":
             return {"deletedCount": store.clear_notifications(context)}
+        if method == "mobile.background.catalog":
+            return {"jobs": background_catalog()}
+        if method == "mobile.background.prepare":
+            return self.prepare_background(params)
+        if method == "mobile.background.commit":
+            return self.commit_background(params)
+        if method == "mobile.background.abort":
+            return self.abort_background(params)
+        if method == "mobile.resources.list":
+            ref = store.require_context(context)
+            return self._resource_packs().list_packs(ref.card_uid)
+        if method == "mobile.resources.preview":
+            ref = store.require_context(context)
+            return self._resource_packs().preview(
+                ref.card_uid,
+                text(
+                    params.get("directoryToken"),
+                    80,
+                    required=True,
+                    field="directoryToken",
+                ),
+            )
+        if method == "mobile.resources.import":
+            ref = store.require_context(context)
+            return {
+                "pack": self._resource_packs().import_pack(
+                    ref.card_uid,
+                    text(
+                        params.get("directoryToken"),
+                        80,
+                        required=True,
+                        field="directoryToken",
+                    ),
+                    text(
+                        params.get("contentDigest"),
+                        64,
+                        required=True,
+                        field="contentDigest",
+                    ),
+                )
+            }
+        if method == "mobile.resources.delete":
+            ref = store.require_context(context)
+            return self._resource_packs().delete_pack(
+                ref.card_uid,
+                text(params.get("packId"), 120, required=True, field="packId"),
+            )
+        if method == "mobile.resources.clear":
+            ref = store.require_context(context)
+            return self._resource_packs().clear_packs(ref.card_uid)
         if method == "mobile.chat.prepare":
             return self.prepare_chat(params)
         if method == "mobile.chat.commit":
@@ -600,19 +661,100 @@ class MobileChatService:
     def initialize(self, params: dict[str, Any]) -> dict[str, Any]:
         storage = mapping(params.get("storage"), field="storage")
         paths = mapping(storage.get("paths"), field="storage.paths")
+        quotas = mapping(storage.get("quotas"), field="storage.quotas")
         data_path = Path(text(paths.get("data"), 1024, required=True, field="storage.paths.data"))
+        assets_path = Path(
+            text(paths.get("assets"), 1024, required=True, field="storage.paths.assets")
+        )
+        assets_quota = quotas.get("assets")
         workspace = Path(
             text(params.get("workspace"), 1024, required=True, field="workspace")
         )
         permissions = params.get("permissions", [])
-        if "storage.data" not in permissions:
-            raise DomainError("permission_denied", "service 需要 storage.data 权限")
-        if not data_path.is_dir() or not workspace.is_dir():
+        if "storage.data" not in permissions or "storage.assets" not in permissions:
+            raise DomainError(
+                "permission_denied",
+                "service 需要 storage.data 与 storage.assets 权限",
+            )
+        if (
+            type(assets_quota) is not int
+            or assets_quota < 0
+            or not data_path.is_dir()
+            or not assets_path.is_dir()
+            or not workspace.is_dir()
+        ):
             raise DomainError("storage_unavailable", "Host storage 或 workspace 不可用")
         self.locale = text(params.get("locale"), 32) or "zh-CN"
         self.store = MobileStore(data_path, workspace)
+        self.resource_packs = ResourcePackManager(assets_path, workspace, assets_quota)
         self.pending.clear()
         return {"ok": True, "locale": self.locale}
+
+    def prepare_background(self, params: dict[str, Any]) -> dict[str, Any]:
+        context = normalize_context(params.get("context"))
+        active_character = mapping(
+            params.get("activeCharacter"),
+            field="activeCharacter",
+        )
+        execution_id, job_id, binding = background_execution(
+            params.get("backgroundExecution")
+        )
+        if normalize_context(binding) != context:
+            raise DomainError("context_stale", "后台任务绑定角色或 session 已变化")
+
+        spec = background_spec(params.get("purpose"))
+        if job_id != spec.job_id:
+            raise DomainError("invalid_params", "后台 jobId 与 purpose 不匹配")
+
+        self._store().bind_context(context.to_dict(), [active_character], active_character)
+        prepared = (
+            self.prepare_mail("mail", {"context": context.to_dict()})
+            if spec.purpose == "mail"
+            else self.prepare_light_app(spec.purpose, {"context": context.to_dict()})
+        )
+        operation = self.pending[prepared["operationId"]]
+        if not isinstance(operation, PendingLightApp):
+            raise DomainError("operation_not_found", "后台生成事务不存在")
+        operation.background_execution_id = execution_id
+        operation.background_job_id = job_id
+        return {
+            "generation": {
+                "operationId": operation.operation_id,
+                "request": prepared["request"],
+                "commitMethod": "mobile.background.commit",
+                "abortMethod": "mobile.background.abort",
+            }
+        }
+
+    def commit_background(self, params: dict[str, Any]) -> dict[str, Any]:
+        operation = self._background_operation(params)
+        result = mapping(params.get("result"), field="result")
+        commit_params = {
+            "context": operation.context.to_dict(),
+            "operationId": operation.operation_id,
+            "content": result.get("content"),
+        }
+        committed = (
+            self.commit_mail("mail", commit_params)
+            if operation.purpose == "mail"
+            else self.commit_light_app(operation.purpose, commit_params)
+        )
+        return {"purpose": operation.purpose, **committed}
+
+    def abort_background(self, params: dict[str, Any]) -> dict[str, Any]:
+        operation = self._background_operation(params)
+        error = mapping(params.get("error"), field="error")
+        code = text(error.get("code"), 80).lower()
+        reason = "cancelled" if "cancel" in code else "timeout" if "timeout" in code else "error"
+        aborted = self.abort_light_app(
+            operation.purpose,
+            {
+                "context": operation.context.to_dict(),
+                "operationId": operation.operation_id,
+                "reason": reason,
+            },
+        )
+        return {"purpose": operation.purpose, **aborted}
 
     def prepare_chat(self, params: dict[str, Any]) -> dict[str, Any]:
         store = self._store()
@@ -1233,6 +1375,30 @@ class MobileChatService:
             raise DomainError("context_stale", "生成事务所属角色或 session 已变化")
         return operation
 
+    def _background_operation(self, params: dict[str, Any]) -> PendingLightApp:
+        operation_id = text(
+            params.get("operationId"),
+            160,
+            required=True,
+            field="operationId",
+        )
+        operation = self.pending.get(operation_id)
+        if operation is None or not isinstance(operation, PendingLightApp):
+            raise DomainError("operation_not_found", "后台生成事务不存在或已结束")
+        execution_id = text(
+            params.get("executionId"),
+            160,
+            required=True,
+            field="executionId",
+        )
+        job_id = text(params.get("jobId"), 80, required=True, field="jobId")
+        if (
+            operation.background_execution_id != execution_id
+            or operation.background_job_id != job_id
+        ):
+            raise DomainError("context_stale", "后台 execution 已变化")
+        return operation
+
     def _start_light_operation(
         self,
         purpose: str,
@@ -1314,6 +1480,11 @@ class MobileChatService:
         if self.store is None:
             raise DomainError("not_initialized", "service 尚未初始化")
         return self.store
+
+    def _resource_packs(self) -> ResourcePackManager:
+        if self.resource_packs is None:
+            raise DomainError("not_initialized", "资源服务尚未初始化")
+        return self.resource_packs
 
 
 class JsonRpcServer:

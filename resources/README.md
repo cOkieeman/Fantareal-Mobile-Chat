@@ -10,6 +10,8 @@ resource-pack/
 └─ assets/
 ```
 
-`resource-pack.json` 必须符合 `schemas/resource-pack.schema.json`。所有 `path` 都必须位于资源包的 `assets/` 子目录；未来导入流程还必须由 Host 执行用户选择、路径隔离、媒体类型检查、文件大小限制与 quota 确认。
+`resource-pack.json` 必须符合 `schemas/resource-pack.schema.json`，并明确填写 `license.name`、`license.source` 与 `license.redistributionAllowed`。这些字段用于导入前展示来源和授权状态，不代表 Fantareal 替素材提供者确认权利。
 
-`empty-pack/` 是零素材示例，不代表已经选择素材许可证。
+所有 `path` 都必须位于资源包的 `assets/` 子目录。MC8 只读取用户通过 Host 显式选择的目录，拒绝路径穿越、符号链接、junction、损坏图片和超 quota 导入；资源按当前 `cardUid` 写入 namespaced `storage.assets`。
+
+`empty-pack/` 是零素材示例，不包含也不暗示任何第三方素材许可。

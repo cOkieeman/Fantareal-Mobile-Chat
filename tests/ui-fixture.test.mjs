@@ -5,7 +5,7 @@ import test from "node:test";
 
 const root = path.resolve(import.meta.dirname, "..");
 
-test("MC6 UI exposes one responsive shell for chat and all light apps", async () => {
+test("MC8 UI exposes one responsive shell for chat, light apps, automation and resources", async () => {
   const html = await readFile(path.join(root, "web/index.html"), "utf8");
 
   for (const marker of [
@@ -60,6 +60,18 @@ test("MC6 UI exposes one responsive shell for chat and all light apps", async ()
     'id="workbench-screen"',
     'id="workbench-form"',
     'id="stop-workbench-generation"',
+    'id="background-screen"',
+    'id="background-job-list"',
+    'id="pause-all-background-jobs"',
+    'id="resume-all-background-jobs"',
+    'id="resources-screen"',
+    'id="resource-pack-list"',
+    'id="resource-quota-progress"',
+    'id="import-resource-pack"',
+    'id="clear-resource-packs"',
+    'id="resource-import-dialog"',
+    'id="resource-import-form"',
+    'id="confirm-resource-import"',
   ]) {
     assert.ok(html.includes(marker), `missing UI marker: ${marker}`);
   }
@@ -264,7 +276,7 @@ test("MC6 bridge keeps phone, live, assistant and workbench in one controller", 
   );
   assert.match(
     script,
-    /await generated\.run\("workbench",[\s\S]+?\n\s*\}\);\n\s*await loadWorkbench\(\);/,
+    /await generated\.run\("workbench",[\s\S]+?\r?\n\s*\}\);\r?\n\s*await loadWorkbench\(\);/,
   );
   assert.match(script, /nodes\.assistantForm\.querySelectorAll\("input, textarea, select, button"\)/);
   assert.equal(html.match(/id="stop-assistant-generation"/g)?.length, 1);
@@ -276,6 +288,71 @@ test("MC6 bridge keeps phone, live, assistant and workbench in one controller", 
   assert.match(script, /MobileChatGeneratedApp\.sameContext\(state\.context,\s*bound\)/);
   assert.match(app, /MobileChatMc6Apps\?\.createController/);
   assert.doesNotMatch(script, /localStorage|sessionStorage|fetch\s*\(|XMLHttpRequest/);
+});
+
+test("MC7 background controller uses Host jobs without a second generation coordinator", async () => {
+  const script = await readFile(path.join(root, "web/background-jobs.js"), "utf8");
+  const app = await readFile(path.join(root, "web/app.js"), "utf8");
+  const html = await readFile(path.join(root, "web/index.html"), "utf8");
+
+  for (const method of [
+    "listBackgroundJobs",
+    "upsertBackgroundJob",
+    "pauseBackgroundJob",
+    "resumeBackgroundJob",
+    "cancelBackgroundJob",
+    "removeBackgroundJob",
+    "runBackgroundJobNow",
+    "pauseAllBackgroundJobs",
+    "resumeAllBackgroundJobs",
+  ]) {
+    assert.ok(script.includes(`"${method}"`), `missing Host background method: ${method}`);
+  }
+  assert.match(script, /handler:\s*"mobile\.background\.prepare"/);
+  assert.match(script, /binding:\s*\{\s*\.\.\.state\.context\s*\}/);
+  assert.match(script, /context:\s*\{\s*\.\.\.state\.context\s*\}/);
+  assert.match(script, /activeCharacter:\s*\{\s*\.\.\.state\.activeCharacter\s*\}/);
+  assert.match(script, /角色已切换 · 需重新启用/);
+  assert.match(script, /关闭小手机窗口不会取消它/);
+  assert.match(app, /MobileChatBackgroundJobs\?\.createController/);
+  assert.match(html, /data-open-screen="background"/);
+  assert.doesNotMatch(script, /generation\.begin|generation\.generate|localStorage|sessionStorage/);
+  assert.doesNotMatch(script, /fetch\s*\(|XMLHttpRequest|WebSocket|EventSource/);
+});
+
+test("MC8 resource controller previews authorization and quota before per-card import", async () => {
+  const script = await readFile(path.join(root, "web/resource-packs.js"), "utf8");
+  const app = await readFile(path.join(root, "web/app.js"), "utf8");
+  const html = await readFile(path.join(root, "web/index.html"), "utf8");
+
+  for (const method of [
+    "mobile.resources.list",
+    "mobile.resources.preview",
+    "mobile.resources.import",
+    "mobile.resources.delete",
+    "mobile.resources.clear",
+  ]) {
+    assert.ok(script.includes(`"${method}"`), `missing resource method: ${method}`);
+  }
+  assert.match(script, /host\.pickDirectory\(\)/);
+  assert.match(script, /directoryToken/);
+  assert.match(script, /contentDigest:\s*preview\.contentDigest/);
+  assert.match(script, /context:\s*state\.context/);
+  assert.match(script, /preview\.license|const license = preview\.license/);
+  assert.match(script, /redistributionAllowed/);
+  assert.match(script, /preview\.fitsQuota/);
+  assert.match(script, /assets_quota_unconfigured/);
+  assert.match(script, /插件管理 → 小手机 → 资源额度/);
+  assert.match(script, /pack\.status === "damaged"/);
+  assert.match(script, /confirmAction\(/);
+  assert.match(script, /image\.src = asset\.dataUrl/);
+  assert.match(app, /MobileChatResourcePacks\?\.createController/);
+  assert.match(html, /data-open-screen="resources"/);
+  assert.match(html, /resource-packs\.js/);
+  assert.equal(html.match(/id="resources-screen"/g)?.length, 1);
+  assert.equal(html.match(/id="resource-import-dialog"/g)?.length, 1);
+  assert.doesNotMatch(script, /localStorage|sessionStorage/);
+  assert.doesNotMatch(script, /fetch\s*\(|XMLHttpRequest|WebSocket|EventSource/);
 });
 
 test("offline package policy and frozen presentation contract remain intact", async () => {

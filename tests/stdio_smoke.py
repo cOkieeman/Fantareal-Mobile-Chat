@@ -24,8 +24,10 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="fantareal-mc-stdio-") as temporary:
         root = Path(temporary)
         data = root / "data"
+        assets = root / "assets"
         workspace = root / "workspace"
         data.mkdir()
+        assets.mkdir()
         workspace.mkdir()
         payload = "\n".join(
             [
@@ -33,9 +35,15 @@ def main() -> None:
                     1,
                     "extension.initialize",
                     {
-                        "storage": {"paths": {"data": str(data)}},
+                        "storage": {
+                            "paths": {"data": str(data), "assets": str(assets)},
+                            "quotas": {
+                                "data": 64 * 1024 * 1024,
+                                "assets": 64 * 1024 * 1024,
+                            },
+                        },
                         "workspace": str(workspace),
-                        "permissions": ["storage.data"],
+                        "permissions": ["storage.data", "storage.assets"],
                         "locale": "zh-CN",
                     },
                 ),

@@ -4,5 +4,10 @@
   "name": "Mobile Chat 空资源包",
   "version": "0.1.0",
   "description": "只用于验证资源包目录与 manifest，不包含任何图片素材。",
+  "license": {
+    "name": "No bundled assets",
+    "source": "Fantareal Mobile Chat empty example",
+    "redistributionAllowed": false
+  },
   "assets": []
 }

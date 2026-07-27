@@ -4,7 +4,7 @@
   "title": "Fantareal Mobile Chat resource pack",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "id", "name", "version", "assets"],
+  "required": ["schemaVersion", "id", "name", "version", "license", "assets"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "id": {
@@ -19,6 +19,18 @@
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"
     },
     "description": { "type": "string", "maxLength": 500 },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "redistributionAllowed"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "source": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "redistributionAllowed": { "type": "boolean" },
+        "url": { "type": "string", "maxLength": 500 },
+        "attribution": { "type": "string", "maxLength": 500 }
+      }
+    },
     "assets": {
       "type": "array",
       "maxItems": 4000,

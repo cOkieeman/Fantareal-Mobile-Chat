@@ -13,8 +13,10 @@ def test_packaged_group_chat_prompt_is_loaded() -> None:
 
 def test_json_rpc_initialize_health_and_typed_error(tmp_path: Path) -> None:
     data_root = tmp_path / "data"
+    assets_root = tmp_path / "assets"
     workspace_root = tmp_path / "workspace"
     data_root.mkdir()
+    assets_root.mkdir()
     workspace_root.mkdir()
     server = JsonRpcServer()
 
@@ -26,10 +28,13 @@ def test_json_rpc_initialize_health_and_typed_error(tmp_path: Path) -> None:
             "params": {
                 "workspace": str(workspace_root),
                 "locale": "zh-CN",
-                "permissions": ["storage.data"],
+                "permissions": ["storage.data", "storage.assets"],
                 "storage": {
-                    "paths": {"data": str(data_root)},
-                    "quotas": {"data": 64 * 1024 * 1024},
+                    "paths": {"data": str(data_root), "assets": str(assets_root)},
+                    "quotas": {
+                        "data": 64 * 1024 * 1024,
+                        "assets": 64 * 1024 * 1024,
+                    },
                 },
             },
         }
