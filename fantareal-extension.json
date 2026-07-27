@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "com.fantareal.mobile-chat",
   "name": "小手机",
-  "description": "角色社交与轻应用空间。MC4 提供按角色隔离的口袋群聊闭环。",
-  "version": "0.4.0-dev.1",
+  "description": "角色社交与轻应用空间。MC6 提供按角色隔离的群聊、轻应用、模拟电话与直播、人物草稿和 Prompt 调试台。",
+  "version": "0.6.0-dev.1",
   "publisher": "cOkieeman",
   "compatibility": {
     "hostApi": ">=1.2.0 <2.0.0"

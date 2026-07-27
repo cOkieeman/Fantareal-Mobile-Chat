@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fantareal.local/schemas/feed-post.schema.json",
+  "title": "Fantareal Mobile Chat Feed Post",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "postId",
+    "content",
+    "authorId",
+    "authorName",
+    "tags",
+    "liked",
+    "likeCount",
+    "source",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "postId": {"type": "string", "pattern": "^feed_[A-Za-z0-9._-]{6,155}$"},
+    "content": {"type": "string", "minLength": 1, "maxLength": 2000},
+    "authorId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$"},
+    "authorName": {"type": "string", "minLength": 1, "maxLength": 120},
+    "tags": {
+      "type": "array",
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 40}
+    },
+    "liked": {"type": "boolean"},
+    "likeCount": {"type": "integer", "minimum": 0, "maximum": 1000000},
+    "source": {"enum": ["manual", "model", "import"]},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "updatedAt": {"type": "string", "format": "date-time"}
+  }
+}

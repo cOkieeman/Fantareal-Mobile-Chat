@@ -8,16 +8,16 @@
       content="default-src 'self'; style-src 'self' fantareal-extension:; script-src 'self' fantareal-extension:; img-src 'self' fantareal-extension: data:; connect-src 'none'; font-src 'self' fantareal-extension:; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <meta name="color-scheme" content="dark light" />
-    <meta name="description" content="Fantareal 小手机 MC4 口袋群聊" />
-    <title>小手机 · 口袋群聊</title>
+    <meta name="description" content="Fantareal 小手机 MC5 角色社交与轻应用空间" />
+    <title>小手机 · 角色轻应用</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="stage" aria-label="Fantareal 小手机">
       <aside class="brief" aria-labelledby="brief-title">
-        <p class="overline">FANTAREAL / MOBILE CHAT 04</p>
-        <h1 id="brief-title">熟悉的小手机，已经接上真实角色与模型。</h1>
+        <p class="overline">FANTAREAL / MOBILE CHAT 05</p>
+        <h1 id="brief-title">群聊之外，角色的动态、论坛与轻应用也留在这里。</h1>
         <p class="brief-copy">
           群聊数据按当前角色隔离，模型请求由 Fantareal Host 统一管理。插件不会读取 API Key，也不会启动独立网络服务。
         </p>
@@ -35,7 +35,7 @@
             <dd>PER CARD</dd>
           </div>
         </dl>
-        <p class="phase-note">MC4 · GROUP CHAT / CONTEXT BOUND</p>
+        <p class="phase-note">MC6 · INTERACTIVE APPS / PROMPT WORKBENCH</p>
       </aside>
 
       <section class="device" aria-label="小手机界面">
@@ -85,15 +85,15 @@
               <span class="navigation-icon" aria-hidden="true">应</span>
               <span>应用</span>
             </button>
-            <button type="button" disabled>
-              <span class="navigation-icon" aria-hidden="true">贴</span>
-              <span>表情</span>
+            <button type="button" data-open-screen="diary">
+              <span class="navigation-icon" aria-hidden="true">记</span>
+              <span>日记</span>
             </button>
-            <button type="button" disabled>
-              <span class="navigation-icon" aria-hidden="true">设</span>
-              <span>设置</span>
+            <button type="button" data-open-screen="calendar">
+              <span class="navigation-icon" aria-hidden="true">历</span>
+              <span>日程</span>
             </button>
-            <small>更多入口将在后续里程碑逐步启用。</small>
+            <small>所有轻应用共用当前角色与同一份 per-card 数据边界。</small>
           </nav>
 
           <div class="screen-stack">
@@ -111,7 +111,7 @@
 
               <div class="section-heading">
                 <h2 id="home-title" tabindex="-1">全部应用</h2>
-                <span>1 项可用</span>
+                <span>11 项可用</span>
               </div>
 
               <nav class="app-grid" aria-label="轻应用">
@@ -119,11 +119,11 @@
                   <span class="app-icon app-icon-chat" aria-hidden="true">聊</span>
                   <strong>群聊</strong>
                 </button>
-                <button type="button" disabled>
+                <button type="button" data-open-screen="feed">
                   <span class="app-icon app-icon-feed" aria-hidden="true">动</span>
                   <strong>动态</strong>
                 </button>
-                <button type="button" disabled>
+                <button type="button" data-open-screen="forum">
                   <span class="app-icon app-icon-forum" aria-hidden="true">坛</span>
                   <strong>论坛</strong>
                 </button>
@@ -131,17 +131,37 @@
                   <span class="app-icon app-icon-sticker" aria-hidden="true">贴</span>
                   <strong>表情</strong>
                 </button>
-                <button type="button" disabled>
+                <button type="button" data-open-screen="mail">
                   <span class="app-icon app-icon-mail" aria-hidden="true">邮</span>
                   <strong>邮箱</strong>
                 </button>
-                <button type="button" disabled>
+                <button type="button" data-open-screen="diary">
                   <span class="app-icon app-icon-diary" aria-hidden="true">记</span>
                   <strong>日记</strong>
                 </button>
-                <button type="button" disabled>
+                <button type="button" data-open-screen="calendar">
                   <span class="app-icon app-icon-calendar" aria-hidden="true">历</span>
                   <strong>日程</strong>
+                </button>
+                <button type="button" data-open-screen="notifications">
+                  <span class="app-icon app-icon-notification" aria-hidden="true">知</span>
+                  <strong>通知</strong>
+                </button>
+                <button type="button" data-open-screen="phone">
+                  <span class="app-icon app-icon-phone" aria-hidden="true">话</span>
+                  <strong>电话</strong>
+                </button>
+                <button type="button" data-open-screen="live">
+                  <span class="app-icon app-icon-live" aria-hidden="true">播</span>
+                  <strong>直播</strong>
+                </button>
+                <button type="button" data-open-screen="assistant">
+                  <span class="app-icon app-icon-assistant" aria-hidden="true">辅</span>
+                  <strong>人物辅助</strong>
+                </button>
+                <button type="button" data-open-screen="workbench">
+                  <span class="app-icon app-icon-workbench" aria-hidden="true">调</span>
+                  <strong>Prompt</strong>
                 </button>
                 <button type="button" disabled>
                   <span class="app-icon app-icon-settings" aria-hidden="true">设</span>
@@ -213,6 +233,308 @@
                     <button id="stop-generation" class="stop-button" type="button" aria-label="停止生成" hidden>■</button>
                   </form>
                 </section>
+              </div>
+            </section>
+
+            <section id="feed-screen" class="screen light-app-screen" data-screen="feed" aria-labelledby="feed-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>CHARACTER FEED</p>
+                  <h2 id="feed-title" tabindex="-1">角色动态</h2>
+                  <span id="feed-count">正在载入…</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="generate-feed" class="light-app-generate-button" type="button">生成</button>
+                  <button id="stop-feed-generation" class="small-icon-button" type="button" aria-label="停止生成动态" title="停止生成动态" hidden>■</button>
+                  <button id="create-feed" class="small-icon-button primary" type="button" aria-label="发布动态">＋</button>
+                </div>
+              </header>
+              <ul id="feed-list" class="light-app-list" aria-label="动态列表"></ul>
+              <div id="feed-empty" class="empty-state light-app-empty">
+                <span aria-hidden="true">动</span>
+                <strong>还没有动态</strong>
+                <p>发布当前角色的一段近况，或让模型生成一条动态。</p>
+                <button id="create-first-feed" type="button">发布第一条动态</button>
+              </div>
+            </section>
+
+            <section id="forum-screen" class="screen light-app-screen" data-screen="forum" aria-labelledby="forum-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>COMMUNITY BOARD</p>
+                  <h2 id="forum-title" tabindex="-1">角色论坛</h2>
+                  <span id="forum-count">正在载入…</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="generate-forum" class="light-app-generate-button" type="button">生成</button>
+                  <button id="stop-forum-generation" class="small-icon-button" type="button" aria-label="停止生成论坛主题" title="停止生成论坛主题" hidden>■</button>
+                  <button id="create-forum-thread" class="small-icon-button primary" type="button" aria-label="发布论坛主题">＋</button>
+                </div>
+              </header>
+              <ul id="forum-list" class="light-app-list" aria-label="论坛主题列表"></ul>
+              <div id="forum-empty" class="empty-state light-app-empty">
+                <span aria-hidden="true">坛</span>
+                <strong>还没有论坛主题</strong>
+                <p>发起一个属于当前角色的话题，再为主题添加回复。</p>
+                <button id="create-first-forum-thread" type="button">发布第一个主题</button>
+              </div>
+            </section>
+
+            <section id="mail-screen" class="screen light-app-screen" data-screen="mail" aria-labelledby="mail-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>CHARACTER MAIL</p>
+                  <h2 id="mail-title" tabindex="-1">角色邮箱</h2>
+                  <span id="mail-count">正在载入…</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="generate-mail" class="light-app-generate-button" type="button">收取</button>
+                  <button id="stop-mail-generation" class="small-icon-button" type="button" aria-label="停止等待邮件" title="停止等待邮件" hidden>■</button>
+                  <button id="compose-mail" class="small-icon-button primary" type="button" aria-label="写邮件">＋</button>
+                </div>
+              </header>
+              <nav class="mail-filters" aria-label="邮箱筛选">
+                <button id="mail-filter-all" class="is-active" type="button">全部 0</button>
+                <button id="mail-filter-unread" type="button">未读 0</button>
+              </nav>
+              <ul id="mail-list" class="light-app-list mail-list" aria-label="邮件线程列表"></ul>
+              <div id="mail-empty" class="empty-state light-app-empty">
+                <span aria-hidden="true">邮</span>
+                <strong>还没有邮件</strong>
+                <p>写一封邮件给当前角色，或让模型生成一封角色来信。</p>
+                <button type="button" data-open-mail-compose>写第一封邮件</button>
+              </div>
+            </section>
+
+            <section id="phone-screen" class="screen light-app-screen mc6-screen" data-screen="phone" aria-labelledby="phone-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>TEXT CALL</p>
+                  <h2 id="phone-title" tabindex="-1">模拟电话</h2>
+                  <span id="phone-count">正在载入…</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="stop-phone-generation" class="small-icon-button" type="button" aria-label="停止生成电话回复" title="停止生成电话回复" hidden>■</button>
+                </div>
+              </header>
+              <div class="mc6-split phone-layout">
+                <aside class="mc6-sidebar" aria-label="通话联系人与历史">
+                  <label class="mc6-field" for="phone-contact-input">
+                    <span>联系人</span>
+                    <select id="phone-contact-input"></select>
+                  </label>
+                  <ul id="phone-session-list" class="mc6-history-list" aria-label="通话历史"></ul>
+                  <p id="phone-history-empty" class="mc6-inline-empty">还没有通话记录。</p>
+                </aside>
+                <section class="mc6-workspace" aria-label="当前模拟通话">
+                  <header class="mc6-workspace-header">
+                    <div>
+                      <strong id="phone-active-name">选择联系人</strong>
+                      <small id="phone-active-state">前台文本模拟，不使用麦克风</small>
+                    </div>
+                    <div class="panel-actions">
+                      <button id="hangup-phone" class="small-icon-button" type="button" aria-label="挂断电话" title="挂断电话">挂</button>
+                      <button id="delete-phone" class="small-icon-button" type="button" aria-label="删除通话记录" title="删除通话记录">删</button>
+                    </div>
+                  </header>
+                  <ol id="phone-lines" class="phone-lines" aria-label="通话台词"></ol>
+                  <div id="phone-lines-empty" class="empty-state mc6-empty">
+                    <span aria-hidden="true">话</span>
+                    <strong>开始一次文本通话</strong>
+                    <p>选择白名单联系人并输入一句话，用户与角色台词会在模型解析成功后一起保存。</p>
+                  </div>
+                  <form id="phone-form" class="mc6-compose">
+                    <label class="sr-only" for="phone-line-input">电话中要说的话</label>
+                    <input id="phone-line-input" type="text" maxlength="500" placeholder="对联系人说一句…" autocomplete="off">
+                    <button id="send-phone-line" type="submit">说话</button>
+                  </form>
+                </section>
+              </div>
+            </section>
+
+            <section id="live-screen" class="screen light-app-screen mc6-screen" data-screen="live" aria-labelledby="live-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>FRONTSTAGE LIVE</p>
+                  <h2 id="live-title" tabindex="-1">模拟直播</h2>
+                  <span id="live-count">正在载入…</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="start-live" class="light-app-generate-button" type="button">开播</button>
+                  <button id="stop-live-generation" class="small-icon-button" type="button" aria-label="停止生成直播" title="停止生成直播" hidden>■</button>
+                </div>
+              </header>
+              <div class="live-stage">
+                <div id="live-empty" class="empty-state mc6-empty">
+                  <span aria-hidden="true">播</span>
+                  <strong>还没有模拟直播</strong>
+                  <p>开播和继续片段都只在当前窗口前台运行，不会创建后台 tick。</p>
+                </div>
+                <article id="live-current" class="live-current" hidden>
+                  <header class="live-current-header">
+                    <div>
+                      <span id="live-badge" class="live-badge">LIVE</span>
+                      <h3 id="live-current-title">直播标题</h3>
+                      <p id="live-current-meta">0 人观看 · 0 赞</p>
+                    </div>
+                    <div class="panel-actions">
+                      <button id="continue-live" class="light-app-generate-button" type="button">继续一段</button>
+                      <button id="like-live" class="small-icon-button" type="button" aria-label="点赞直播">赞</button>
+                      <button id="end-live" class="small-icon-button" type="button" aria-label="结束直播">停</button>
+                      <button id="delete-live" class="small-icon-button" type="button" aria-label="删除直播">删</button>
+                    </div>
+                  </header>
+                  <ol id="live-segments" class="live-segments" aria-label="直播片段"></ol>
+                  <ul id="live-messages" class="live-messages" aria-label="直播弹幕"></ul>
+                  <form id="live-message-form" class="mc6-compose">
+                    <label class="sr-only" for="live-message-input">发送弹幕</label>
+                    <input id="live-message-input" type="text" maxlength="240" placeholder="发一条弹幕…" autocomplete="off">
+                    <button type="submit">发送</button>
+                  </form>
+                </article>
+                <ul id="live-history" class="mc6-history-list live-history" aria-label="直播历史"></ul>
+              </div>
+            </section>
+
+            <section id="assistant-screen" class="screen light-app-screen mc6-screen" data-screen="assistant" aria-labelledby="assistant-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>CHARACTER DRAFTS</p>
+                  <h2 id="assistant-title" tabindex="-1">人物辅助</h2>
+                  <span id="assistant-count">正在载入…</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="create-assistant-draft" class="small-icon-button primary" type="button" aria-label="生成人物草稿">＋</button>
+                </div>
+              </header>
+              <div class="assistant-boundary" role="note">
+                这里只保存小手机内部草稿；来源仅限用户说明或 Host 白名单角色摘要，不写回角色卡。
+              </div>
+              <ul id="assistant-list" class="light-app-list assistant-list" aria-label="人物草稿列表"></ul>
+              <div id="assistant-empty" class="empty-state light-app-empty">
+                <span aria-hidden="true">辅</span>
+                <strong>还没有人物草稿</strong>
+                <p>创建新人物设想，或从已授权角色摘要中提取一份可编辑草稿。</p>
+                <button id="create-first-assistant-draft" type="button">创建第一份草稿</button>
+              </div>
+            </section>
+
+            <section id="workbench-screen" class="screen light-app-screen mc6-screen" data-screen="workbench" aria-labelledby="workbench-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>PROMPT WORKBENCH</p>
+                  <h2 id="workbench-title" tabindex="-1">Prompt 调试台</h2>
+                  <span id="workbench-count">追加式指令 · 锁定 JSON 契约</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="stop-workbench-generation" class="small-icon-button" type="button" aria-label="停止契约测试" title="停止契约测试" hidden>■</button>
+                </div>
+              </header>
+              <div class="workbench-layout">
+                <form id="workbench-form" class="workbench-form">
+                  <label class="mc6-field" for="workbench-scope-input">
+                    <span>应用 scope</span>
+                    <select id="workbench-scope-input"></select>
+                  </label>
+                  <label class="workbench-toggle">
+                    <input id="workbench-enabled-input" type="checkbox">
+                    <span>启用当前追加指令</span>
+                  </label>
+                  <label class="mc6-field" for="workbench-instruction-input">
+                    <span>追加指令</span>
+                    <textarea id="workbench-instruction-input" rows="5" maxlength="4000" placeholder="只追加风格或内容偏好，不能覆盖 JSON 输出契约与权限边界。"></textarea>
+                  </label>
+                  <label class="mc6-field" for="workbench-test-input">
+                    <span>契约测试输入</span>
+                    <input id="workbench-test-input" type="text" maxlength="1000" placeholder="可选：输入一条测试情境">
+                  </label>
+                  <div class="workbench-actions">
+                    <button id="save-workbench" type="submit">保存</button>
+                    <button id="reset-workbench" type="button">重置</button>
+                    <button id="preview-workbench" type="button">预览</button>
+                    <button id="test-workbench" type="button">运行 JSON 测试</button>
+                  </div>
+                </form>
+                <section class="workbench-output" aria-labelledby="workbench-preview-title">
+                  <h3 id="workbench-preview-title">当前边界</h3>
+                  <pre id="workbench-preview">选择 scope 后可预览 package prompt 与锁定契约。</pre>
+                  <h3>最近诊断</h3>
+                  <ul id="workbench-diagnostics" class="workbench-diagnostics"></ul>
+                </section>
+              </div>
+            </section>
+
+            <section id="diary-screen" class="screen light-app-screen" data-screen="diary" aria-labelledby="diary-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>PRIVATE NOTES</p>
+                  <h2 id="diary-title" tabindex="-1">角色日记</h2>
+                  <span id="diary-count">正在载入…</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="generate-diary" class="light-app-generate-button" type="button">生成</button>
+                  <button id="stop-diary-generation" class="small-icon-button" type="button" aria-label="停止生成日记" title="停止生成日记" hidden>■</button>
+                  <button id="create-diary" class="small-icon-button primary" type="button" aria-label="新建日记">＋</button>
+                </div>
+              </header>
+              <ul id="diary-list" class="light-app-list" aria-label="日记列表"></ul>
+              <div id="diary-empty" class="empty-state light-app-empty">
+                <span aria-hidden="true">记</span>
+                <strong>还没有日记</strong>
+                <p>记录当前角色的一段心情、片段或回忆。</p>
+                <button id="create-first-diary" type="button">写第一篇日记</button>
+              </div>
+            </section>
+
+            <section id="calendar-screen" class="screen light-app-screen" data-screen="calendar" aria-labelledby="calendar-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>UPCOMING</p>
+                  <h2 id="calendar-title" tabindex="-1">角色日程</h2>
+                  <span id="calendar-count">正在载入…</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="generate-calendar" class="light-app-generate-button" type="button">生成</button>
+                  <button id="stop-calendar-generation" class="small-icon-button" type="button" aria-label="停止生成日程" title="停止生成日程" hidden>■</button>
+                  <button id="create-calendar" class="small-icon-button primary" type="button" aria-label="新建日程">＋</button>
+                </div>
+              </header>
+              <ul id="calendar-list" class="light-app-list" aria-label="日程列表"></ul>
+              <div id="calendar-empty" class="empty-state light-app-empty">
+                <span aria-hidden="true">历</span>
+                <strong>还没有日程</strong>
+                <p>为当前角色安排一个约定、事件或纪念日。</p>
+                <button id="create-first-calendar" type="button">添加第一条日程</button>
+              </div>
+            </section>
+
+            <section id="notifications-screen" class="screen light-app-screen" data-screen="notifications" aria-labelledby="notifications-title" hidden>
+              <header class="light-app-header">
+                <button class="back-button" type="button" data-open-screen="home" aria-label="返回应用桌面">←</button>
+                <div>
+                  <p>ACTIVITY</p>
+                  <h2 id="notifications-title" tabindex="-1">通知</h2>
+                  <span id="notifications-count">正在载入…</span>
+                </div>
+                <div class="panel-actions">
+                  <button id="read-all-notifications" class="small-icon-button" type="button" aria-label="全部标记已读" title="全部标记已读">✓</button>
+                  <button id="clear-notifications" class="small-icon-button" type="button" aria-label="清空通知" title="清空通知">⌫</button>
+                </div>
+              </header>
+              <ul id="notifications-list" class="light-app-list notification-list" aria-label="通知列表"></ul>
+              <div id="notifications-empty" class="empty-state light-app-empty">
+                <span aria-hidden="true">知</span>
+                <strong>暂时没有通知</strong>
+                <p>新动态、论坛主题、日记和日程会在这里留下受管活动记录。</p>
               </div>
             </section>
           </div>
@@ -322,6 +644,280 @@
       </form>
     </dialog>
 
+    <dialog id="diary-dialog" class="mobile-dialog">
+      <form id="diary-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">DIARY ENTRY</p>
+            <h2 id="diary-dialog-title">新建日记</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="diary-dialog" aria-label="关闭">×</button>
+        </header>
+        <div class="form-grid">
+          <label>
+            <span>日期</span>
+            <input id="diary-date-input" name="entryDate" type="date" required />
+          </label>
+          <label>
+            <span>心情</span>
+            <input id="diary-mood-input" name="mood" maxlength="40" placeholder="例如：安静" />
+          </label>
+        </div>
+        <label>
+          <span>标题</span>
+          <input id="diary-title-input" name="title" maxlength="120" required autocomplete="off" placeholder="今天发生了什么？" />
+        </label>
+        <label>
+          <span>正文</span>
+          <textarea id="diary-content-input" name="content" maxlength="8000" rows="8" required placeholder="写下一段属于当前角色的记忆。"></textarea>
+        </label>
+        <p id="diary-form-error" class="form-error" role="alert" hidden></p>
+        <footer>
+          <button id="delete-diary" class="danger-button" type="button" hidden>删除日记</button>
+          <span></span>
+          <button class="secondary-button" type="button" data-close-dialog="diary-dialog">取消</button>
+          <button class="primary-button" type="submit">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="calendar-dialog" class="mobile-dialog">
+      <form id="calendar-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">CALENDAR EVENT</p>
+            <h2 id="calendar-dialog-title">新建日程</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="calendar-dialog" aria-label="关闭">×</button>
+        </header>
+        <label>
+          <span>标题</span>
+          <input id="calendar-title-input" name="title" maxlength="120" required autocomplete="off" placeholder="例如：去旧书店" />
+        </label>
+        <div class="form-grid">
+          <label>
+            <span>开始日期</span>
+            <input id="calendar-start-input" name="startsOn" type="date" required />
+          </label>
+          <label>
+            <span>结束日期</span>
+            <input id="calendar-end-input" name="endsOn" type="date" />
+          </label>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>地点</span>
+            <input id="calendar-location-input" name="location" maxlength="200" placeholder="可选" />
+          </label>
+          <label>
+            <span>状态</span>
+            <select id="calendar-status-input" name="status">
+              <option value="planned">计划中</option>
+              <option value="completed">已完成</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          <span>说明</span>
+          <textarea id="calendar-description-input" name="description" maxlength="2000" rows="5" placeholder="补充时间、人物或事件背景。"></textarea>
+        </label>
+        <p id="calendar-form-error" class="form-error" role="alert" hidden></p>
+        <footer>
+          <button id="delete-calendar" class="danger-button" type="button" hidden>删除日程</button>
+          <span></span>
+          <button class="secondary-button" type="button" data-close-dialog="calendar-dialog">取消</button>
+          <button class="primary-button" type="submit">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="feed-dialog" class="mobile-dialog">
+      <form id="feed-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">FEED POST</p>
+            <h2 id="feed-dialog-title">发布动态</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="feed-dialog" aria-label="关闭">×</button>
+        </header>
+        <label>
+          <span>动态正文</span>
+          <textarea id="feed-content-input" name="content" maxlength="2000" rows="7" required placeholder="分享当前角色的一段近况。"></textarea>
+        </label>
+        <label>
+          <span>标签</span>
+          <input id="feed-tags-input" name="tags" maxlength="300" autocomplete="off" placeholder="使用逗号分隔，例如：雨夜，读书" />
+        </label>
+        <p id="feed-form-error" class="form-error" role="alert" hidden></p>
+        <footer>
+          <button id="delete-feed" class="danger-button" type="button" hidden>删除动态</button>
+          <span></span>
+          <button class="secondary-button" type="button" data-close-dialog="feed-dialog">取消</button>
+          <button class="primary-button" type="submit">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="forum-thread-dialog" class="mobile-dialog">
+      <form id="forum-thread-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">FORUM THREAD</p>
+            <h2 id="forum-thread-dialog-title">发布论坛主题</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="forum-thread-dialog" aria-label="关闭">×</button>
+        </header>
+        <div class="form-grid">
+          <label>
+            <span>标题</span>
+            <input id="forum-title-input" name="title" maxlength="120" required autocomplete="off" placeholder="想聊些什么？" />
+          </label>
+          <label>
+            <span>分类</span>
+            <input id="forum-category-input" name="category" maxlength="60" required autocomplete="off" value="闲聊" />
+          </label>
+        </div>
+        <label>
+          <span>正文</span>
+          <textarea id="forum-body-input" name="body" maxlength="8000" rows="8" required placeholder="写下主题内容。"></textarea>
+        </label>
+        <p id="forum-thread-form-error" class="form-error" role="alert" hidden></p>
+        <footer>
+          <button id="delete-forum-thread" class="danger-button" type="button" hidden>删除主题</button>
+          <span></span>
+          <button class="secondary-button" type="button" data-close-dialog="forum-thread-dialog">取消</button>
+          <button class="primary-button" type="submit">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="forum-reply-dialog" class="mobile-dialog">
+      <form id="forum-reply-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">FORUM REPLY</p>
+            <h2>回复主题</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="forum-reply-dialog" aria-label="关闭">×</button>
+        </header>
+        <label>
+          <span>回复内容</span>
+          <textarea id="forum-reply-content-input" name="content" maxlength="2000" rows="6" required placeholder="写下当前角色的回复。"></textarea>
+        </label>
+        <p id="forum-reply-form-error" class="form-error" role="alert" hidden></p>
+        <footer>
+          <span></span>
+          <button class="secondary-button" type="button" data-close-dialog="forum-reply-dialog">取消</button>
+          <button class="primary-button" type="submit">发布回复</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="mail-compose-dialog" class="mobile-dialog">
+      <form id="mail-compose-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">COMPOSE MAIL</p>
+            <h2>写邮件</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="mail-compose-dialog" aria-label="关闭">×</button>
+        </header>
+        <label>
+          <span>收件角色</span>
+          <select id="mail-recipient-input" name="recipientId" required></select>
+        </label>
+        <label>
+          <span>主题</span>
+          <input id="mail-subject-input" name="subject" maxlength="120" autocomplete="off" placeholder="可留空" />
+        </label>
+        <label>
+          <span>正文</span>
+          <textarea id="mail-content-input" name="content" maxlength="2000" rows="8" required placeholder="写下要寄出的邮件。发送成功后，角色回信会与它一起保存。"></textarea>
+        </label>
+        <p id="mail-compose-form-error" class="form-error" role="alert" hidden></p>
+        <footer>
+          <span></span>
+          <button class="secondary-button" type="button" data-close-dialog="mail-compose-dialog">取消</button>
+          <button class="primary-button" type="submit">发送并等待回信</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="mail-thread-dialog" class="mobile-dialog mail-thread-dialog">
+      <form id="mail-reply-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">MAIL THREAD</p>
+            <h2 id="mail-thread-dialog-title" tabindex="-1">邮件主题</h2>
+            <span id="mail-thread-meta"></span>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="mail-thread-dialog" aria-label="关闭">×</button>
+        </header>
+        <ul id="mail-thread-messages" class="mail-thread-messages" aria-label="邮件往来"></ul>
+        <div class="mail-reply-form">
+          <label>
+            <span>回复邮件</span>
+            <textarea id="mail-reply-content-input" name="content" maxlength="2000" rows="5" required placeholder="回复会与角色回信一起原子保存。"></textarea>
+          </label>
+          <p id="mail-reply-form-error" class="form-error" role="alert" hidden></p>
+          <footer>
+            <button id="delete-mail-thread" class="danger-button" type="button">删除邮件</button>
+            <span></span>
+            <button class="primary-button" type="submit">发送并等待回信</button>
+          </footer>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="assistant-dialog" class="mobile-dialog assistant-dialog">
+      <form id="assistant-form" method="dialog">
+        <header>
+          <div>
+            <p class="dialog-overline">CHARACTER DRAFT</p>
+            <h2 id="assistant-dialog-title">生成人物草稿</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="assistant-dialog" aria-label="关闭">×</button>
+        </header>
+        <div id="assistant-generate-fields" class="assistant-dialog-fields">
+          <label>
+            <span>模式</span>
+            <select id="assistant-mode-input">
+              <option value="create">根据说明创建</option>
+              <option value="extract">从白名单摘要提取</option>
+            </select>
+          </label>
+          <label>
+            <span>来源角色</span>
+            <select id="assistant-source-input"></select>
+          </label>
+          <label>
+            <span>用户说明</span>
+            <textarea id="assistant-notes-input" rows="5" maxlength="2000" placeholder="描述希望得到的人物草稿；不会读取角色卡正文。"></textarea>
+          </label>
+        </div>
+        <div id="assistant-edit-fields" class="assistant-dialog-fields" hidden>
+          <label><span>名称</span><input id="assistant-name-input" type="text" maxlength="120"></label>
+          <label><span>摘要</span><textarea id="assistant-summary-input" rows="3" maxlength="1000"></textarea></label>
+          <label><span>性格</span><textarea id="assistant-personality-input" rows="2" maxlength="1000"></textarea></label>
+          <label><span>情境</span><textarea id="assistant-scenario-input" rows="2" maxlength="1000"></textarea></label>
+          <label><span>聊天风格</span><textarea id="assistant-chat-style-input" rows="2" maxlength="600"></textarea></label>
+          <label><span>标签（逗号分隔）</span><input id="assistant-tags-input" type="text" maxlength="400"></label>
+        </div>
+        <p id="assistant-form-error" class="form-error" hidden></p>
+        <footer>
+          <button id="stop-assistant-generation" class="secondary-button" type="button" hidden>停止生成</button>
+          <button class="secondary-button" type="button" data-close-dialog="assistant-dialog">取消</button>
+          <button id="assistant-submit" type="submit">生成草稿</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <script src="generated-app.js"></script>
+    <script src="light-apps.js"></script>
+    <script src="social-apps.js"></script>
+    <script src="mail-apps.js"></script>
+    <script src="mc6-apps.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

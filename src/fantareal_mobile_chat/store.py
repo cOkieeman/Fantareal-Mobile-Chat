@@ -16,6 +16,29 @@ from .domain import (
     normalize_message,
     now_iso,
 )
+from .interactive_apps import (
+    normalize_live_message,
+    normalize_live_stream,
+    normalize_phone_line,
+    normalize_phone_session,
+)
+from .light_apps import (
+    normalize_calendar_event,
+    normalize_diary_entry,
+    normalize_notification,
+)
+from .mail_apps import normalize_mail_message, normalize_mail_thread
+from .social_apps import (
+    normalize_feed_post,
+    normalize_forum_reply,
+    normalize_forum_thread,
+)
+from .workbench import (
+    PROMPT_SCOPES,
+    normalize_character_draft,
+    normalize_prompt_diagnostic,
+    normalize_prompt_profile,
+)
 
 TOKEN_PATTERN = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
@@ -172,6 +195,853 @@ class MobileStore:
         self.get_group(ref.to_dict(), group_id)
         self._write_messages(ref.card_uid, group_id, [])
 
+    def list_diary_entries(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        entries = self._read_collection(
+            self._diary_path(ref.card_uid),
+            "entries",
+            normalize_diary_entry,
+        )
+        return sorted(
+            entries,
+            key=lambda item: (item["entryDate"], item["createdAt"]),
+            reverse=True,
+        )
+
+    def create_diary_entry(self, context: Any, value: Any) -> dict[str, Any]:
+        return self.create_diary_entries(context, [value])[0]
+
+    def create_diary_entries(
+        self,
+        context: Any,
+        values: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        created = [normalize_diary_entry(value) for value in values]
+        entries = self.list_diary_entries(ref.to_dict())
+        known = {item["entryId"] for item in entries}
+        for entry in created:
+            if entry["entryId"] in known:
+                raise DomainError("conflict", "日记 ID 已存在")
+            known.add(entry["entryId"])
+        self._write_collection(
+            self._diary_path(ref.card_uid),
+            "entries",
+            [*entries, *created],
+        )
+        return created
+
+    def update_diary_entry(
+        self,
+        context: Any,
+        entry_id: str,
+        value: Any,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        entries = self.list_diary_entries(ref.to_dict())
+        index = self._index_of(entries, "entryId", entry_id, "日记")
+        updated = normalize_diary_entry(
+            {**dict(value), "entryId": entry_id, "updatedAt": now_iso()},
+            existing=entries[index],
+        )
+        entries[index] = updated
+        self._write_collection(self._diary_path(ref.card_uid), "entries", entries)
+        return updated
+
+    def delete_diary_entry(self, context: Any, entry_id: str) -> None:
+        ref = self.require_context(context)
+        entries = self.list_diary_entries(ref.to_dict())
+        index = self._index_of(entries, "entryId", entry_id, "日记")
+        entries.pop(index)
+        self._write_collection(self._diary_path(ref.card_uid), "entries", entries)
+
+    def list_calendar_events(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        events = self._read_collection(
+            self._calendar_path(ref.card_uid),
+            "events",
+            normalize_calendar_event,
+        )
+        return sorted(
+            events,
+            key=lambda item: (
+                item["status"] != "planned",
+                item["startsOn"],
+                item["createdAt"],
+            ),
+        )
+
+    def create_calendar_event(self, context: Any, value: Any) -> dict[str, Any]:
+        return self.create_calendar_events(context, [value])[0]
+
+    def create_calendar_events(
+        self,
+        context: Any,
+        values: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        created = [normalize_calendar_event(value) for value in values]
+        events = self.list_calendar_events(ref.to_dict())
+        known = {item["eventId"] for item in events}
+        for event in created:
+            if event["eventId"] in known:
+                raise DomainError("conflict", "日程 ID 已存在")
+            known.add(event["eventId"])
+        self._write_collection(
+            self._calendar_path(ref.card_uid),
+            "events",
+            [*events, *created],
+        )
+        return created
+
+    def update_calendar_event(
+        self,
+        context: Any,
+        event_id: str,
+        value: Any,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        events = self.list_calendar_events(ref.to_dict())
+        index = self._index_of(events, "eventId", event_id, "日程")
+        updated = normalize_calendar_event(
+            {**dict(value), "eventId": event_id, "updatedAt": now_iso()},
+            existing=events[index],
+        )
+        events[index] = updated
+        self._write_collection(self._calendar_path(ref.card_uid), "events", events)
+        return updated
+
+    def delete_calendar_event(self, context: Any, event_id: str) -> None:
+        ref = self.require_context(context)
+        events = self.list_calendar_events(ref.to_dict())
+        index = self._index_of(events, "eventId", event_id, "日程")
+        events.pop(index)
+        self._write_collection(self._calendar_path(ref.card_uid), "events", events)
+
+    def list_feed_posts(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        posts = self._read_collection(
+            self._feed_path(ref.card_uid),
+            "posts",
+            normalize_feed_post,
+        )
+        return sorted(posts, key=lambda item: item["createdAt"], reverse=True)
+
+    def create_feed_post(self, context: Any, value: Any) -> dict[str, Any]:
+        return self.create_feed_posts(context, [value])[0]
+
+    def create_feed_posts(
+        self,
+        context: Any,
+        values: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        created = [normalize_feed_post(value) for value in values]
+        posts = self.list_feed_posts(ref.to_dict())
+        known = {item["postId"] for item in posts}
+        for post in created:
+            if post["postId"] in known:
+                raise DomainError("conflict", "动态 ID 已存在")
+            known.add(post["postId"])
+        self._write_collection(
+            self._feed_path(ref.card_uid),
+            "posts",
+            [*posts, *created],
+        )
+        return created
+
+    def update_feed_post(
+        self,
+        context: Any,
+        post_id: str,
+        value: Any,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        posts = self.list_feed_posts(ref.to_dict())
+        index = self._index_of(posts, "postId", post_id, "动态")
+        updated = normalize_feed_post(
+            {**dict(value), "postId": post_id, "updatedAt": now_iso()},
+            existing=posts[index],
+        )
+        posts[index] = updated
+        self._write_collection(self._feed_path(ref.card_uid), "posts", posts)
+        return updated
+
+    def delete_feed_post(self, context: Any, post_id: str) -> None:
+        ref = self.require_context(context)
+        posts = self.list_feed_posts(ref.to_dict())
+        index = self._index_of(posts, "postId", post_id, "动态")
+        posts.pop(index)
+        self._write_collection(self._feed_path(ref.card_uid), "posts", posts)
+
+    def toggle_feed_like(self, context: Any, post_id: str) -> dict[str, Any]:
+        ref = self.require_context(context)
+        posts = self.list_feed_posts(ref.to_dict())
+        index = self._index_of(posts, "postId", post_id, "动态")
+        current = posts[index]
+        liked = not current["liked"]
+        posts[index] = normalize_feed_post(
+            {
+                **current,
+                "liked": liked,
+                "likeCount": max(0, current["likeCount"] + (1 if liked else -1)),
+                "updatedAt": now_iso(),
+            }
+        )
+        self._write_collection(self._feed_path(ref.card_uid), "posts", posts)
+        return posts[index]
+
+    def list_forum_threads(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        threads = self._read_collection(
+            self._forum_path(ref.card_uid),
+            "threads",
+            normalize_forum_thread,
+        )
+        return sorted(threads, key=lambda item: item["updatedAt"], reverse=True)
+
+    def create_forum_thread(self, context: Any, value: Any) -> dict[str, Any]:
+        return self.create_forum_threads(context, [value])[0]
+
+    def create_forum_threads(
+        self,
+        context: Any,
+        values: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        created = [normalize_forum_thread(value) for value in values]
+        threads = self.list_forum_threads(ref.to_dict())
+        known = {item["threadId"] for item in threads}
+        for thread in created:
+            if thread["threadId"] in known:
+                raise DomainError("conflict", "论坛主题 ID 已存在")
+            known.add(thread["threadId"])
+        self._write_collection(
+            self._forum_path(ref.card_uid),
+            "threads",
+            [*threads, *created],
+        )
+        return created
+
+    def update_forum_thread(
+        self,
+        context: Any,
+        thread_id: str,
+        value: Any,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        threads = self.list_forum_threads(ref.to_dict())
+        index = self._index_of(threads, "threadId", thread_id, "论坛主题")
+        updated = normalize_forum_thread(
+            {**dict(value), "threadId": thread_id, "updatedAt": now_iso()},
+            existing=threads[index],
+        )
+        threads[index] = updated
+        self._write_collection(self._forum_path(ref.card_uid), "threads", threads)
+        return updated
+
+    def delete_forum_thread(self, context: Any, thread_id: str) -> None:
+        ref = self.require_context(context)
+        threads = self.list_forum_threads(ref.to_dict())
+        index = self._index_of(threads, "threadId", thread_id, "论坛主题")
+        threads.pop(index)
+        self._write_collection(self._forum_path(ref.card_uid), "threads", threads)
+
+    def create_forum_reply(
+        self,
+        context: Any,
+        thread_id: str,
+        value: Any,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        ref = self.require_context(context)
+        threads = self.list_forum_threads(ref.to_dict())
+        index = self._index_of(threads, "threadId", thread_id, "论坛主题")
+        reply = normalize_forum_reply(value)
+        if any(item["replyId"] == reply["replyId"] for item in threads[index]["replies"]):
+            raise DomainError("conflict", "论坛回复 ID 已存在")
+        updated = normalize_forum_thread(
+            {
+                **threads[index],
+                "replies": [*threads[index]["replies"], reply],
+                "updatedAt": now_iso(),
+            }
+        )
+        threads[index] = updated
+        self._write_collection(self._forum_path(ref.card_uid), "threads", threads)
+        return updated, reply
+
+    def delete_forum_reply(
+        self,
+        context: Any,
+        thread_id: str,
+        reply_id: str,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        threads = self.list_forum_threads(ref.to_dict())
+        index = self._index_of(threads, "threadId", thread_id, "论坛主题")
+        replies = threads[index]["replies"]
+        reply_index = self._index_of(replies, "replyId", reply_id, "论坛回复")
+        replies.pop(reply_index)
+        updated = normalize_forum_thread(
+            {
+                **threads[index],
+                "replies": replies,
+                "updatedAt": now_iso(),
+            }
+        )
+        threads[index] = updated
+        self._write_collection(self._forum_path(ref.card_uid), "threads", threads)
+        return updated
+
+    def list_mail_threads(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        threads = self._read_collection(
+            self._mail_path(ref.card_uid),
+            "threads",
+            normalize_mail_thread,
+        )
+        return sorted(threads, key=lambda item: item["updatedAt"], reverse=True)
+
+    def get_mail_thread(self, context: Any, thread_id: str) -> dict[str, Any]:
+        threads = self.list_mail_threads(context)
+        index = self._index_of(threads, "threadId", thread_id, "邮件线程")
+        return threads[index]
+
+    def create_mail_thread(self, context: Any, value: Any) -> dict[str, Any]:
+        return self.create_mail_threads(context, [value])[0]
+
+    def create_mail_threads(
+        self,
+        context: Any,
+        values: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        created = [normalize_mail_thread(value) for value in values]
+        threads = self.list_mail_threads(ref.to_dict())
+        known = {item["threadId"] for item in threads}
+        for thread in created:
+            if thread["threadId"] in known:
+                raise DomainError("conflict", "邮件线程 ID 已存在")
+            known.add(thread["threadId"])
+        self._write_collection(
+            self._mail_path(ref.card_uid),
+            "threads",
+            [*threads, *created],
+        )
+        return created
+
+    def update_mail_thread(
+        self,
+        context: Any,
+        thread_id: str,
+        value: Any,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        threads = self.list_mail_threads(ref.to_dict())
+        index = self._index_of(threads, "threadId", thread_id, "邮件线程")
+        updated = normalize_mail_thread(
+            {**dict(value), "threadId": thread_id, "updatedAt": now_iso()},
+            existing=threads[index],
+        )
+        threads[index] = updated
+        self._write_collection(self._mail_path(ref.card_uid), "threads", threads)
+        return updated
+
+    def mark_mail_thread(
+        self,
+        context: Any,
+        thread_id: str,
+        is_read: bool,
+    ) -> dict[str, Any]:
+        return self.update_mail_thread(context, thread_id, {"isRead": is_read})
+
+    def delete_mail_thread(self, context: Any, thread_id: str) -> None:
+        ref = self.require_context(context)
+        threads = self.list_mail_threads(ref.to_dict())
+        index = self._index_of(threads, "threadId", thread_id, "邮件线程")
+        threads.pop(index)
+        self._write_collection(self._mail_path(ref.card_uid), "threads", threads)
+
+    def append_mail_messages(
+        self,
+        context: Any,
+        thread_id: str,
+        values: list[dict[str, Any]],
+        *,
+        is_read: bool,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        ref = self.require_context(context)
+        threads = self.list_mail_threads(ref.to_dict())
+        index = self._index_of(threads, "threadId", thread_id, "邮件线程")
+        created = [normalize_mail_message(value) for value in values]
+        known = {item["messageId"] for item in threads[index]["messages"]}
+        for message in created:
+            if message["messageId"] in known:
+                raise DomainError("conflict", "邮件消息 ID 已存在")
+            known.add(message["messageId"])
+        updated = normalize_mail_thread(
+            {
+                **threads[index],
+                "messages": [*threads[index]["messages"], *created],
+                "isRead": is_read,
+                "updatedAt": now_iso(),
+            }
+        )
+        threads[index] = updated
+        self._write_collection(self._mail_path(ref.card_uid), "threads", threads)
+        return updated, created
+
+    def list_phone_sessions(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        sessions = self._read_collection(
+            self._phone_path(ref.card_uid),
+            "sessions",
+            normalize_phone_session,
+        )
+        return sorted(sessions, key=lambda item: item["updatedAt"], reverse=True)
+
+    def get_phone_session(self, context: Any, session_id: str) -> dict[str, Any]:
+        sessions = self.list_phone_sessions(context)
+        return sessions[self._index_of(sessions, "sessionId", session_id, "通话")]
+
+    def commit_phone_session(
+        self,
+        context: Any,
+        *,
+        session_id: str,
+        contact: dict[str, Any],
+        user_line: str,
+        generated_lines: list[dict[str, Any]],
+        status: str,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        sessions = self.list_phone_sessions(ref.to_dict())
+        index = next(
+            (
+                item_index
+                for item_index, item in enumerate(sessions)
+                if item["sessionId"] == session_id
+            ),
+            None,
+        )
+        existing = sessions[index] if index is not None else None
+        if existing and existing["status"] != "ongoing":
+            raise DomainError("conflict", "已结束的通话不能继续")
+        if existing and existing["contactId"] != contact["cardUid"]:
+            raise DomainError("context_mismatch", "通话联系人已变化")
+        added = []
+        if user_line:
+            added.append(
+                normalize_phone_line(
+                    {
+                        "direction": "sent",
+                        "authorId": "user",
+                        "authorName": "我",
+                        "content": user_line,
+                        "mood": "speaking",
+                        "source": "manual",
+                    }
+                )
+            )
+        added.extend(generated_lines)
+        ended = status in {"ended", "missed"}
+        session = normalize_phone_session(
+            {
+                "sessionId": session_id,
+                "contactId": contact["cardUid"],
+                "contactName": contact["name"],
+                "status": status,
+                "endedBy": "character" if ended else "",
+                "endedAt": now_iso() if ended else "",
+                "lines": [*(existing or {}).get("lines", []), *added],
+                "source": (existing or {}).get("source", "model"),
+                "startedAt": (existing or {}).get("startedAt", now_iso()),
+                "updatedAt": now_iso(),
+            }
+        )
+        if index is None:
+            sessions.append(session)
+        else:
+            sessions[index] = session
+        self._write_collection(self._phone_path(ref.card_uid), "sessions", sessions)
+        return session
+
+    def hangup_phone_session(self, context: Any, session_id: str) -> dict[str, Any]:
+        ref = self.require_context(context)
+        sessions = self.list_phone_sessions(ref.to_dict())
+        index = self._index_of(sessions, "sessionId", session_id, "通话")
+        if sessions[index]["status"] != "ongoing":
+            return sessions[index]
+        updated = normalize_phone_session(
+            {
+                **sessions[index],
+                "status": "ended",
+                "endedBy": "user",
+                "endedAt": now_iso(),
+                "updatedAt": now_iso(),
+            }
+        )
+        sessions[index] = updated
+        self._write_collection(self._phone_path(ref.card_uid), "sessions", sessions)
+        return updated
+
+    def delete_phone_session(self, context: Any, session_id: str) -> None:
+        ref = self.require_context(context)
+        sessions = self.list_phone_sessions(ref.to_dict())
+        sessions.pop(self._index_of(sessions, "sessionId", session_id, "通话"))
+        self._write_collection(self._phone_path(ref.card_uid), "sessions", sessions)
+
+    def list_live_streams(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        streams = self._read_collection(
+            self._live_path(ref.card_uid),
+            "streams",
+            normalize_live_stream,
+        )
+        return sorted(streams, key=lambda item: item["updatedAt"], reverse=True)
+
+    def get_live_stream(self, context: Any, stream_id: str) -> dict[str, Any]:
+        streams = self.list_live_streams(context)
+        return streams[self._index_of(streams, "streamId", stream_id, "直播")]
+
+    def create_live_stream(self, context: Any, value: Any) -> dict[str, Any]:
+        ref = self.require_context(context)
+        stream = normalize_live_stream(value)
+        streams = self.list_live_streams(ref.to_dict())
+        if any(item["streamId"] == stream["streamId"] for item in streams):
+            raise DomainError("conflict", "直播 ID 已存在")
+        self._write_collection(
+            self._live_path(ref.card_uid),
+            "streams",
+            [*streams, stream],
+        )
+        return stream
+
+    def apply_live_tick(
+        self,
+        context: Any,
+        stream_id: str,
+        tick: dict[str, Any],
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        streams = self.list_live_streams(ref.to_dict())
+        index = self._index_of(streams, "streamId", stream_id, "直播")
+        current = streams[index]
+        if current["status"] != "live":
+            raise DomainError("conflict", "已结束的直播不能继续")
+        status = tick["status"]
+        updated = normalize_live_stream(
+            {
+                **current,
+                "segments": [*current["segments"], tick["segment"]],
+                "messages": [*current["messages"], *tick["messages"]],
+                "status": status,
+                "viewerCount": tick["viewerCount"],
+                "likeCount": max(current["likeCount"], tick["likeCount"]),
+                "updatedAt": now_iso(),
+                "endedAt": now_iso() if status == "ended" else "",
+            }
+        )
+        streams[index] = updated
+        self._write_collection(self._live_path(ref.card_uid), "streams", streams)
+        return updated
+
+    def append_live_message(
+        self,
+        context: Any,
+        stream_id: str,
+        value: Any,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        streams = self.list_live_streams(ref.to_dict())
+        index = self._index_of(streams, "streamId", stream_id, "直播")
+        current = streams[index]
+        if current["status"] != "live":
+            raise DomainError("conflict", "已结束的直播不能发送弹幕")
+        message = normalize_live_message(value)
+        updated = normalize_live_stream(
+            {
+                **current,
+                "messages": [*current["messages"], message],
+                "updatedAt": now_iso(),
+            }
+        )
+        streams[index] = updated
+        self._write_collection(self._live_path(ref.card_uid), "streams", streams)
+        return updated
+
+    def toggle_live_like(self, context: Any, stream_id: str) -> dict[str, Any]:
+        ref = self.require_context(context)
+        streams = self.list_live_streams(ref.to_dict())
+        index = self._index_of(streams, "streamId", stream_id, "直播")
+        current = streams[index]
+        liked = not current["userLiked"]
+        count = max(0, current["likeCount"] + (1 if liked else -1))
+        updated = normalize_live_stream(
+            {
+                **current,
+                "userLiked": liked,
+                "likeCount": count,
+                "updatedAt": now_iso(),
+            }
+        )
+        streams[index] = updated
+        self._write_collection(self._live_path(ref.card_uid), "streams", streams)
+        return updated
+
+    def end_live_stream(self, context: Any, stream_id: str) -> dict[str, Any]:
+        ref = self.require_context(context)
+        streams = self.list_live_streams(ref.to_dict())
+        index = self._index_of(streams, "streamId", stream_id, "直播")
+        updated = normalize_live_stream(
+            {
+                **streams[index],
+                "status": "ended",
+                "updatedAt": now_iso(),
+                "endedAt": streams[index]["endedAt"] or now_iso(),
+            }
+        )
+        streams[index] = updated
+        self._write_collection(self._live_path(ref.card_uid), "streams", streams)
+        return updated
+
+    def delete_live_stream(self, context: Any, stream_id: str) -> None:
+        ref = self.require_context(context)
+        streams = self.list_live_streams(ref.to_dict())
+        streams.pop(self._index_of(streams, "streamId", stream_id, "直播"))
+        self._write_collection(self._live_path(ref.card_uid), "streams", streams)
+
+    def list_character_drafts(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        drafts = self._read_collection(
+            self._assistant_path(ref.card_uid),
+            "drafts",
+            normalize_character_draft,
+        )
+        return sorted(drafts, key=lambda item: item["updatedAt"], reverse=True)
+
+    def create_character_drafts(
+        self,
+        context: Any,
+        values: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        created = [normalize_character_draft(value) for value in values]
+        drafts = self.list_character_drafts(ref.to_dict())
+        known = {item["draftId"] for item in drafts}
+        for draft in created:
+            if draft["draftId"] in known:
+                raise DomainError("conflict", "人物草稿 ID 已存在")
+            known.add(draft["draftId"])
+        self._write_collection(
+            self._assistant_path(ref.card_uid),
+            "drafts",
+            [*drafts, *created],
+        )
+        return created
+
+    def update_character_draft(
+        self,
+        context: Any,
+        draft_id: str,
+        value: Any,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        drafts = self.list_character_drafts(ref.to_dict())
+        index = self._index_of(drafts, "draftId", draft_id, "人物草稿")
+        updated = normalize_character_draft(
+            {**dict(value), "draftId": draft_id, "updatedAt": now_iso()},
+            existing=drafts[index],
+        )
+        drafts[index] = updated
+        self._write_collection(self._assistant_path(ref.card_uid), "drafts", drafts)
+        return updated
+
+    def delete_character_draft(self, context: Any, draft_id: str) -> None:
+        ref = self.require_context(context)
+        drafts = self.list_character_drafts(ref.to_dict())
+        drafts.pop(self._index_of(drafts, "draftId", draft_id, "人物草稿"))
+        self._write_collection(self._assistant_path(ref.card_uid), "drafts", drafts)
+
+    def list_prompt_profiles(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        payload = self._read_json(
+            self._workbench_path(ref.card_uid),
+            {"schemaVersion": 1, "profiles": [], "diagnostics": []},
+        )
+        rows = payload.get("profiles", []) if isinstance(payload, dict) else []
+        saved = {}
+        for item in rows if isinstance(rows, list) else []:
+            try:
+                profile = normalize_prompt_profile(item)
+            except DomainError:
+                continue
+            saved[profile["scope"]] = profile
+        return [
+            saved.get(
+                scope,
+                normalize_prompt_profile(
+                    {
+                        "scope": scope,
+                        "enabled": False,
+                        "instruction": "",
+                        "updatedAt": "1970-01-01T00:00:00Z",
+                    }
+                ),
+            )
+            for scope in PROMPT_SCOPES
+        ]
+
+    def get_prompt_profile(self, context: Any, scope: str) -> dict[str, Any]:
+        profiles = self.list_prompt_profiles(context)
+        return profiles[self._index_of(profiles, "scope", scope, "Prompt scope")]
+
+    def update_prompt_profile(self, context: Any, value: Any) -> dict[str, Any]:
+        ref = self.require_context(context)
+        profile = normalize_prompt_profile(value)
+        profile["updatedAt"] = now_iso()
+        profiles = self.list_prompt_profiles(ref.to_dict())
+        index = self._index_of(profiles, "scope", profile["scope"], "Prompt scope")
+        profiles[index] = profile
+        diagnostics = self.list_prompt_diagnostics(ref.to_dict())
+        self._write_workbench(ref.card_uid, profiles, diagnostics)
+        return profile
+
+    def reset_prompt_profile(self, context: Any, scope: str) -> dict[str, Any]:
+        return self.update_prompt_profile(
+            context,
+            {"scope": scope, "enabled": False, "instruction": ""},
+        )
+
+    def list_prompt_diagnostics(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        payload = self._read_json(
+            self._workbench_path(ref.card_uid),
+            {"schemaVersion": 1, "profiles": [], "diagnostics": []},
+        )
+        rows = payload.get("diagnostics", []) if isinstance(payload, dict) else []
+        result = []
+        for item in rows if isinstance(rows, list) else []:
+            try:
+                result.append(normalize_prompt_diagnostic(item))
+            except DomainError:
+                continue
+        return sorted(result, key=lambda item: item["createdAt"], reverse=True)[:20]
+
+    def create_prompt_diagnostic(self, context: Any, value: Any) -> dict[str, Any]:
+        ref = self.require_context(context)
+        diagnostic = normalize_prompt_diagnostic(value)
+        profiles = self.list_prompt_profiles(ref.to_dict())
+        diagnostics = [diagnostic, *self.list_prompt_diagnostics(ref.to_dict())][:20]
+        self._write_workbench(ref.card_uid, profiles, diagnostics)
+        return diagnostic
+
+    def list_notifications(self, context: Any) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        notifications = self._read_collection(
+            self._notifications_path(ref.card_uid),
+            "notifications",
+            normalize_notification,
+        )
+        return sorted(notifications, key=lambda item: item["createdAt"], reverse=True)
+
+    def create_notification(self, context: Any, value: Any) -> dict[str, Any]:
+        return self.create_notifications(context, [value])[0]
+
+    def create_notifications(
+        self,
+        context: Any,
+        values: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        ref = self.require_context(context)
+        created = [normalize_notification(value) for value in values]
+        notifications = self.list_notifications(ref.to_dict())
+        known = {item["notificationId"] for item in notifications}
+        for notification in created:
+            if notification["notificationId"] in known:
+                raise DomainError("conflict", "通知 ID 已存在")
+            known.add(notification["notificationId"])
+        self._write_collection(
+            self._notifications_path(ref.card_uid),
+            "notifications",
+            [*notifications, *created],
+        )
+        return created
+
+    def mark_notification(
+        self,
+        context: Any,
+        notification_id: str,
+        is_read: bool,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        notifications = self.list_notifications(ref.to_dict())
+        index = self._index_of(
+            notifications,
+            "notificationId",
+            notification_id,
+            "通知",
+        )
+        updated = normalize_notification(
+            {
+                **notifications[index],
+                "notificationId": notification_id,
+                "isRead": is_read,
+            }
+        )
+        notifications[index] = updated
+        self._write_collection(
+            self._notifications_path(ref.card_uid),
+            "notifications",
+            notifications,
+        )
+        return updated
+
+    def mark_all_notifications_read(self, context: Any) -> int:
+        ref = self.require_context(context)
+        notifications = self.list_notifications(ref.to_dict())
+        unread_count = sum(not item["isRead"] for item in notifications)
+        if unread_count:
+            notifications = [{**item, "isRead": True} for item in notifications]
+            self._write_collection(
+                self._notifications_path(ref.card_uid),
+                "notifications",
+                notifications,
+            )
+        return unread_count
+
+    def clear_notifications(self, context: Any) -> int:
+        ref = self.require_context(context)
+        notifications = self.list_notifications(ref.to_dict())
+        self._write_collection(
+            self._notifications_path(ref.card_uid),
+            "notifications",
+            [],
+        )
+        return len(notifications)
+
+    def remove_notifications_for_source(
+        self,
+        context: Any,
+        source: str,
+        source_id: str,
+    ) -> int:
+        ref = self.require_context(context)
+        notifications = self.list_notifications(ref.to_dict())
+        remaining = [
+            item
+            for item in notifications
+            if item["source"] != source or item["sourceId"] != source_id
+        ]
+        removed = len(notifications) - len(remaining)
+        if removed:
+            self._write_collection(
+                self._notifications_path(ref.card_uid),
+                "notifications",
+                remaining,
+            )
+        return removed
+
     def preview_import(self, context: Any, directory_token: str) -> dict[str, Any]:
         ref = self.require_context(context)
         root = self._legacy_root(directory_token, ref.card_uid)
@@ -291,6 +1161,22 @@ class MobileStore:
         groups = self._groups_path(card_uid)
         if not groups.exists():
             self._write_json(groups, {"schemaVersion": 1, "groups": []})
+        for path, key in (
+            (self._diary_path(card_uid), "entries"),
+            (self._calendar_path(card_uid), "events"),
+            (self._feed_path(card_uid), "posts"),
+            (self._forum_path(card_uid), "threads"),
+            (self._mail_path(card_uid), "threads"),
+            (self._phone_path(card_uid), "sessions"),
+            (self._live_path(card_uid), "streams"),
+            (self._assistant_path(card_uid), "drafts"),
+            (self._notifications_path(card_uid), "notifications"),
+        ):
+            if not path.exists():
+                self._write_collection(path, key, [])
+        workbench = self._workbench_path(card_uid)
+        if not workbench.exists():
+            self._write_workbench(card_uid, [], [])
 
     def _card_root(self, card_uid: str) -> Path:
         root = (self.cards_root / card_uid).resolve()
@@ -306,6 +1192,36 @@ class MobileStore:
     def _messages_path(self, card_uid: str, group_id: str) -> Path:
         self._validate_group_id(group_id)
         return self._card_root(card_uid) / "messages" / f"{group_id}.json"
+
+    def _diary_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "diary.json"
+
+    def _calendar_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "calendar.json"
+
+    def _feed_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "feed.json"
+
+    def _forum_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "forum.json"
+
+    def _mail_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "mail.json"
+
+    def _phone_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "phone.json"
+
+    def _live_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "live.json"
+
+    def _assistant_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "assistant.json"
+
+    def _workbench_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "prompt-workbench.json"
+
+    def _notifications_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "notifications.json"
 
     @staticmethod
     def _validate_group_id(group_id: str) -> None:
@@ -354,6 +1270,47 @@ class MobileStore:
             self._messages_path(card_uid, group_id),
             {"schemaVersion": 1, "messages": messages},
         )
+
+    def _read_collection(self, path: Path, key: str, normalizer: Any) -> list[dict[str, Any]]:
+        payload = self._read_json(path, {"schemaVersion": 1, key: []})
+        rows = payload.get(key, []) if isinstance(payload, dict) else []
+        result = []
+        for item in rows if isinstance(rows, list) else []:
+            try:
+                result.append(normalizer(item))
+            except DomainError:
+                continue
+        return result
+
+    def _write_collection(self, path: Path, key: str, items: list[dict[str, Any]]) -> None:
+        self._write_json(path, {"schemaVersion": 1, key: items})
+
+    def _write_workbench(
+        self,
+        card_uid: str,
+        profiles: list[dict[str, Any]],
+        diagnostics: list[dict[str, Any]],
+    ) -> None:
+        self._write_json(
+            self._workbench_path(card_uid),
+            {
+                "schemaVersion": 1,
+                "profiles": profiles,
+                "diagnostics": diagnostics,
+            },
+        )
+
+    @staticmethod
+    def _index_of(
+        items: list[dict[str, Any]],
+        key: str,
+        value: str,
+        label: str,
+    ) -> int:
+        index = next((index for index, item in enumerate(items) if item[key] == value), None)
+        if index is None:
+            raise DomainError("not_found", f"{label}不存在")
+        return index
 
     @staticmethod
     def _without_last(group: dict[str, Any]) -> dict[str, Any]:

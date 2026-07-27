@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fantareal.local/schemas/character-draft.schema.json",
+  "title": "Fantareal Mobile Chat Character Draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["draftId", "mode", "name", "summary", "personality", "scenario", "chatStyle", "tags", "sourceCharacterId", "source", "createdAt", "updatedAt"],
+  "properties": {
+    "draftId": {"type": "string", "pattern": "^draft_[A-Za-z0-9._-]{6,154}$"},
+    "mode": {"enum": ["create", "extract"]},
+    "name": {"type": "string", "minLength": 1, "maxLength": 120},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "personality": {"type": "string", "maxLength": 1000},
+    "scenario": {"type": "string", "maxLength": 1000},
+    "chatStyle": {"type": "string", "maxLength": 600},
+    "tags": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": 40}},
+    "sourceCharacterId": {"type": "string", "maxLength": 160},
+    "source": {"enum": ["manual", "model", "import"]},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "updatedAt": {"type": "string", "format": "date-time"}
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fantareal.local/schemas/live-stream.schema.json",
+  "title": "Fantareal Mobile Chat Live Stream",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["streamId", "hostId", "hostName", "title", "status", "segments", "messages", "viewerCount", "likeCount", "userLiked", "source", "createdAt", "updatedAt", "endedAt"],
+  "properties": {
+    "streamId": {"type": "string", "pattern": "^live_[A-Za-z0-9._-]{6,155}$"},
+    "hostId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$"},
+    "hostName": {"type": "string", "minLength": 1, "maxLength": 120},
+    "title": {"type": "string", "minLength": 1, "maxLength": 120},
+    "status": {"enum": ["live", "ended"]},
+    "segments": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["segmentId", "content", "createdAt"],
+        "properties": {
+          "segmentId": {"type": "string", "pattern": "^liveseg_[A-Za-z0-9._-]{6,152}$"},
+          "content": {"type": "string", "minLength": 1, "maxLength": 2000},
+          "createdAt": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "messages": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["messageId", "authorId", "authorName", "authorType", "content", "mood", "highlight", "source", "createdAt"],
+        "properties": {
+          "messageId": {"type": "string", "pattern": "^livemsg_[A-Za-z0-9._-]{6,152}$"},
+          "authorId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$"},
+          "authorName": {"type": "string", "minLength": 1, "maxLength": 120},
+          "authorType": {"enum": ["user", "character", "viewer"]},
+          "content": {"type": "string", "minLength": 1, "maxLength": 240},
+          "mood": {"type": "string", "maxLength": 40},
+          "highlight": {"type": "boolean"},
+          "source": {"enum": ["manual", "model", "import"]},
+          "createdAt": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "viewerCount": {"type": "integer", "minimum": 0, "maximum": 10000000},
+    "likeCount": {"type": "integer", "minimum": 0, "maximum": 10000000},
+    "userLiked": {"type": "boolean"},
+    "source": {"enum": ["manual", "model", "import"]},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "updatedAt": {"type": "string", "format": "date-time"},
+    "endedAt": {"type": "string", "maxLength": 80}
+  }
+}

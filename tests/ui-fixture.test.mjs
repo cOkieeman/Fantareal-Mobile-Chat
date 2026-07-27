@@ -5,7 +5,7 @@ import test from "node:test";
 
 const root = path.resolve(import.meta.dirname, "..");
 
-test("MC4 UI exposes one responsive group-chat DOM and its complete controls", async () => {
+test("MC6 UI exposes one responsive shell for chat and all light apps", async () => {
   const html = await readFile(path.join(root, "web/index.html"), "utf8");
 
   for (const marker of [
@@ -27,6 +27,39 @@ test("MC4 UI exposes one responsive group-chat DOM and its complete controls", a
     'id="app-navigation"',
     'id="close-extension"',
     'id="fixture-status"',
+    'id="diary-screen"',
+    'id="calendar-screen"',
+    'id="notifications-screen"',
+    'id="feed-screen"',
+    'id="forum-screen"',
+    'id="mail-screen"',
+    'id="diary-dialog"',
+    'id="calendar-dialog"',
+    'id="feed-dialog"',
+    'id="forum-thread-dialog"',
+    'id="forum-reply-dialog"',
+    'id="mail-compose-dialog"',
+    'id="mail-thread-dialog"',
+    'id="generate-diary"',
+    'id="stop-diary-generation"',
+    'id="generate-calendar"',
+    'id="stop-calendar-generation"',
+    'id="generate-mail"',
+    'id="stop-mail-generation"',
+    'id="phone-screen"',
+    'id="phone-session-list"',
+    'id="phone-form"',
+    'id="stop-phone-generation"',
+    'id="live-screen"',
+    'id="live-current"',
+    'id="live-message-form"',
+    'id="stop-live-generation"',
+    'id="assistant-screen"',
+    'id="assistant-dialog"',
+    'id="stop-assistant-generation"',
+    'id="workbench-screen"',
+    'id="workbench-form"',
+    'id="stop-workbench-generation"',
   ]) {
     assert.ok(html.includes(marker), `missing UI marker: ${marker}`);
   }
@@ -48,8 +81,8 @@ test("MC4 bridge flow covers context, CRUD, generation, cancellation and explici
   for (const bridge of [
     "host.getContext()",
     "host.getCharacterContext()",
-    "host.generate(prepared.request)",
-    "host.cancelGenerate()",
+    "return host.generate(request)",
+    "return host.cancelGenerate()",
     "host.pickDirectory()",
     "host.getPresentation()",
     "host.setPresentationMode(presentation)",
@@ -79,11 +112,15 @@ test("MC4 bridge flow covers context, CRUD, generation, cancellation and explici
   assert.match(script, /contextRevision:\s*revision/);
   assert.match(script, /sessionId/);
   assert.match(script, /reason,\s*message:\s*errorMessage\(error\)/);
+  assert.match(script, /generation:\s*null/);
+  assert.match(script, /generationCoordinator\.begin\("chat"\)/);
+  assert.match(script, /generationCoordinator\.generate\(prepared\.request\)/);
+  assert.match(script, /generationCoordinator\.requestCancel\("chat"\)/);
+  assert.doesNotMatch(script, /busy:\s*false|cancelRequested:\s*false,\s*\n\s*editingGroupId/);
   assert.match(script, /data-chat-view|dataset\.chatView/);
-  assert.ok(
-    script.includes(
-      'window.addEventListener("focus", () => {\n    if (!state.busy) void syncContext({ quiet: true });\n  });',
-    ),
+  assert.match(
+    script,
+    /window\.addEventListener\("focus",\s*\(\) => \{\s*if \(!generationBusy\(\)\) void syncContext\(\{ quiet: true \}\);\s*\}\);/,
     "focus recovery must retry Character Context even after the initial bind failed",
   );
   const syncContextSource = script.match(
@@ -106,6 +143,139 @@ test("MC4 bridge flow covers context, CRUD, generation, cancellation and explici
     script,
     /fetch\s*\(|XMLHttpRequest|WebSocket|EventSource|localStorage|sessionStorage/,
   );
+});
+
+test("MC5 light-app bridge covers diary, calendar and notification lifecycle", async () => {
+  const script = await readFile(path.join(root, "web/light-apps.js"), "utf8");
+  const generated = await readFile(path.join(root, "web/generated-app.js"), "utf8");
+  for (const method of [
+    "mobile.diary.list",
+    "mobile.diary.create",
+    "mobile.diary.update",
+    "mobile.diary.delete",
+    "mobile.calendar.list",
+    "mobile.calendar.create",
+    "mobile.calendar.update",
+    "mobile.calendar.delete",
+    "mobile.notifications.list",
+    "mobile.notifications.mark",
+    "mobile.notifications.readAll",
+    "mobile.notifications.clear",
+  ]) {
+    assert.ok(script.includes(`"${method}"`), `missing service method: ${method}`);
+  }
+  assert.match(script, /MobileChatGeneratedApp\.sameContext\(state\.context,\s*bound\)/);
+  for (const phase of ["prepare", "commit", "abort"]) {
+    assert.ok(
+      generated.includes(`\${servicePrefix}.generate.${phase}`),
+      `missing generated light-app service phase: ${phase}`,
+    );
+  }
+  assert.match(generated, /generation\.begin\(owner\)/);
+  assert.match(generated, /generation\.generate\(prepared\.request\)/);
+  assert.match(generated, /generation\.requestCancel\(owner\)/);
+  assert.doesNotMatch(`${script}\n${generated}`, /retry|localStorage|sessionStorage/);
+  assert.doesNotMatch(
+    `${script}\n${generated}`,
+    /fetch\s*\(|XMLHttpRequest|WebSocket|EventSource/,
+  );
+});
+
+test("MC5B social bridge covers feed, forum, replies and shared generation", async () => {
+  const script = await readFile(path.join(root, "web/social-apps.js"), "utf8");
+  const app = await readFile(path.join(root, "web/app.js"), "utf8");
+  for (const method of [
+    "mobile.feed.list",
+    "mobile.feed.create",
+    "mobile.feed.update",
+    "mobile.feed.delete",
+    "mobile.feed.like.toggle",
+    "mobile.forum.list",
+    "mobile.forum.create",
+    "mobile.forum.update",
+    "mobile.forum.delete",
+    "mobile.forum.reply.create",
+    "mobile.forum.reply.delete",
+  ]) {
+    assert.ok(script.includes(`"${method}"`), `missing service method: ${method}`);
+  }
+  assert.match(script, /generated\.run\("feed"\)/);
+  assert.match(script, /generated\.run\("forum"\)/);
+  assert.match(script, /MobileChatGeneratedApp\.sameContext\(state\.context,\s*bound\)/);
+  assert.match(app, /featureControllers\s*=\s*\[/);
+  assert.match(app, /MobileChatLightApps\?\.createController/);
+  assert.match(app, /MobileChatSocialApps\?\.createController/);
+  assert.doesNotMatch(script, /localStorage|sessionStorage|fetch\s*\(|XMLHttpRequest/);
+});
+
+test("MC5C mail bridge covers threads, compose, reply and shared generation", async () => {
+  const script = await readFile(path.join(root, "web/mail-apps.js"), "utf8");
+  const app = await readFile(path.join(root, "web/app.js"), "utf8");
+  for (const method of [
+    "mobile.mail.list",
+    "mobile.mail.mark",
+    "mobile.mail.delete",
+  ]) {
+    assert.ok(script.includes(`"${method}"`), `missing service method: ${method}`);
+  }
+  assert.match(script, /generated\.run\("mail"\)/);
+  assert.match(script, /generated\.run\("mail-compose",\s*\{/);
+  assert.match(script, /servicePrefix:\s*"mobile\.mail\.compose"/);
+  assert.match(script, /generated\.run\("mail-reply",\s*\{/);
+  assert.match(script, /servicePrefix:\s*"mobile\.mail\.reply"/);
+  assert.match(script, /MobileChatGeneratedApp\.sameContext\(state\.context,\s*bound\)/);
+  assert.match(app, /MobileChatMailApps\?\.createController/);
+  assert.doesNotMatch(script, /localStorage|sessionStorage|fetch\s*\(|XMLHttpRequest/);
+});
+
+test("MC6 bridge keeps phone, live, assistant and workbench in one controller", async () => {
+  const script = await readFile(path.join(root, "web/mc6-apps.js"), "utf8");
+  const app = await readFile(path.join(root, "web/app.js"), "utf8");
+  const html = await readFile(path.join(root, "web/index.html"), "utf8");
+  for (const method of [
+    "mobile.phone.list",
+    "mobile.phone.hangup",
+    "mobile.phone.delete",
+    "mobile.live.list",
+    "mobile.live.message.create",
+    "mobile.live.like.toggle",
+    "mobile.live.end",
+    "mobile.live.delete",
+    "mobile.assistant.list",
+    "mobile.assistant.update",
+    "mobile.assistant.delete",
+    "mobile.workbench.get",
+    "mobile.workbench.update",
+    "mobile.workbench.reset",
+    "mobile.workbench.preview",
+  ]) {
+    assert.ok(script.includes(`"${method}"`), `missing service method: ${method}`);
+  }
+  assert.match(script, /generated\.run\("phone",\s*\{/);
+  assert.match(script, /servicePrefix:\s*"mobile\.phone\.call"/);
+  assert.match(script, /generated\.run\("live"\s*,/);
+  assert.match(script, /generated\.run\("live-tick",\s*\{/);
+  assert.match(script, /servicePrefix:\s*"mobile\.live\.tick"/);
+  assert.match(script, /generated\.run\("assistant",\s*\{/);
+  assert.match(script, /generated\.run\("workbench",\s*\{/);
+  assert.match(
+    script,
+    /if \(session && state\.characters\.some\([\s\S]+nodes\.phoneContact\.value = session\.contactId;/,
+  );
+  assert.match(
+    script,
+    /await generated\.run\("workbench",[\s\S]+?\n\s*\}\);\n\s*await loadWorkbench\(\);/,
+  );
+  assert.match(script, /nodes\.assistantForm\.querySelectorAll\("input, textarea, select, button"\)/);
+  assert.equal(html.match(/id="stop-assistant-generation"/g)?.length, 1);
+  assert.ok(
+    html.indexOf('id="stop-assistant-generation"')
+      > html.indexOf('id="assistant-dialog"'),
+    "assistant stop button must remain inside its modal dialog",
+  );
+  assert.match(script, /MobileChatGeneratedApp\.sameContext\(state\.context,\s*bound\)/);
+  assert.match(app, /MobileChatMc6Apps\?\.createController/);
+  assert.doesNotMatch(script, /localStorage|sessionStorage|fetch\s*\(|XMLHttpRequest/);
 });
 
 test("offline package policy and frozen presentation contract remain intact", async () => {

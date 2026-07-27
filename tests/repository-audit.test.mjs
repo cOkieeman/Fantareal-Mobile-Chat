@@ -18,7 +18,12 @@ const forbiddenNames = new Set([".env", "settings.json", "conversations.json", "
 
 async function collectFiles(directory, result = []) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue;
+    if (
+      entry.isDirectory() &&
+      (ignoredDirectories.has(entry.name) || entry.name.startsWith(".smoke-venv-"))
+    ) {
+      continue;
+    }
     const absolute = path.join(directory, entry.name);
     if (entry.isDirectory()) {
       await collectFiles(absolute, result);

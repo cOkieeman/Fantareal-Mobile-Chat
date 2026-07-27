@@ -313,7 +313,7 @@ def build_llm_request(
     }
 
 
-def _model_payload(raw: str) -> Any:
+def model_payload(raw: str) -> Any:
     cleaned = THINK_PATTERN.sub("", text(raw, 65_536, required=True, field="content")).strip()
     fenced = FENCE_PATTERN.search(cleaned)
     if fenced:
@@ -332,7 +332,7 @@ def _model_payload(raw: str) -> Any:
 
 
 def parse_llm_messages(raw: str, group: dict[str, Any]) -> list[dict[str, str]]:
-    payload = _model_payload(raw)
+    payload = model_payload(raw)
     if not isinstance(payload, dict) or not isinstance(payload.get("messages"), list):
         raise DomainError("parse_failed", "模型返回缺少 messages array")
     characters = [item for item in group["members"] if item["kind"] == "character"]
