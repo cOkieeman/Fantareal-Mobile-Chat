@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fantareal.local/schemas/mobile-chat/calendar-event.schema.json",
+  "title": "Fantareal Mobile Chat Calendar Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "title",
+    "description",
+    "startsOn",
+    "endsOn",
+    "allDay",
+    "status",
+    "participants",
+    "location",
+    "tags",
+    "source",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "pattern": "^calendar_[A-Za-z0-9._-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "startsOn": {
+      "type": "string",
+      "format": "date"
+    },
+    "endsOn": {
+      "anyOf": [
+        {
+          "const": ""
+        },
+        {
+          "type": "string",
+          "format": "date"
+        }
+      ]
+    },
+    "allDay": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": ["planned", "completed", "cancelled"]
+    },
+    "participants": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["roleId", "displayName", "kind", "summary"],
+        "properties": {
+          "roleId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "kind": {
+            "enum": ["user", "character"]
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      }
+    },
+    "location": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40
+      }
+    },
+    "source": {
+      "enum": ["manual", "model", "import"]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

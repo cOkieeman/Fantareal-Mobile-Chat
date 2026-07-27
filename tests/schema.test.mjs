@@ -39,3 +39,99 @@ test("empty resource pack is valid and contains no bundled assets", async () => 
   assert.match(resourcePack.version, /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/);
   assert.deepEqual(resourcePack.assets, []);
 });
+
+test("MC5A light apps keep separate closed schemas", async () => {
+  const diary = await readJson("schemas/diary-entry.schema.json");
+  const calendar = await readJson("schemas/calendar-event.schema.json");
+  const notification = await readJson("schemas/notification.schema.json");
+
+  assert.equal(diary.additionalProperties, false);
+  assert.equal(calendar.additionalProperties, false);
+  assert.equal(notification.additionalProperties, false);
+  assert.match(diary.properties.entryId.pattern, /^\^diary_/);
+  assert.match(calendar.properties.eventId.pattern, /^\^calendar_/);
+  assert.match(notification.properties.notificationId.pattern, /^\^notification_/);
+  assert.deepEqual(diary.properties.source.enum, ["manual", "model", "import"]);
+  assert.deepEqual(calendar.properties.status.enum, ["planned", "completed", "cancelled"]);
+  assert.deepEqual(notification.properties.source.enum, [
+    "system",
+    "diary",
+    "calendar",
+    "feed",
+    "forum",
+    "mail",
+    "phone",
+    "live",
+    "import",
+  ]);
+});
+
+test("MC5B social apps keep separate closed schemas", async () => {
+  const feed = await readJson("schemas/feed-post.schema.json");
+  const forum = await readJson("schemas/forum-thread.schema.json");
+  const reply = forum.properties.replies.items;
+
+  assert.equal(feed.additionalProperties, false);
+  assert.equal(forum.additionalProperties, false);
+  assert.equal(reply.additionalProperties, false);
+  assert.match(feed.properties.postId.pattern, /^\^feed_/);
+  assert.match(forum.properties.threadId.pattern, /^\^thread_/);
+  assert.match(reply.properties.replyId.pattern, /^\^reply_/);
+  assert.deepEqual(feed.properties.source.enum, ["manual", "model", "import"]);
+  assert.deepEqual(forum.properties.source.enum, ["manual", "model", "import"]);
+  assert.deepEqual(reply.properties.source.enum, ["manual", "model", "import"]);
+});
+
+test("MC5C mail keeps a closed thread and message schema", async () => {
+  const mail = await readJson("schemas/mail-thread.schema.json");
+  const message = mail.properties.messages.items;
+
+  assert.equal(mail.additionalProperties, false);
+  assert.equal(message.additionalProperties, false);
+  assert.match(mail.properties.threadId.pattern, /^\^mail_/);
+  assert.match(message.properties.messageId.pattern, /^\^mailmsg_/);
+  assert.deepEqual(message.properties.direction.enum, ["sent", "received"]);
+  assert.deepEqual(mail.properties.source.enum, ["manual", "model", "import"]);
+  assert.deepEqual(message.properties.source.enum, ["manual", "model", "import"]);
+});
+
+test("MC6 interactive apps and workbench keep separate closed schemas", async () => {
+  const phone = await readJson("schemas/phone-session.schema.json");
+  const live = await readJson("schemas/live-stream.schema.json");
+  const draft = await readJson("schemas/character-draft.schema.json");
+  const profile = await readJson("schemas/prompt-profile.schema.json");
+
+  assert.equal(phone.additionalProperties, false);
+  assert.equal(phone.properties.lines.items.additionalProperties, false);
+  assert.match(phone.properties.sessionId.pattern, /^\^call_/);
+  assert.deepEqual(phone.properties.status.enum, ["ongoing", "ended", "missed"]);
+  assert.deepEqual(phone.properties.lines.items.properties.direction.enum, [
+    "sent",
+    "received",
+  ]);
+
+  assert.equal(live.additionalProperties, false);
+  assert.equal(live.properties.segments.items.additionalProperties, false);
+  assert.equal(live.properties.messages.items.additionalProperties, false);
+  assert.match(live.properties.streamId.pattern, /^\^live_/);
+  assert.deepEqual(live.properties.status.enum, ["live", "ended"]);
+  assert.equal(live.properties.messages.maxItems, 100);
+
+  assert.equal(draft.additionalProperties, false);
+  assert.match(draft.properties.draftId.pattern, /^\^draft_/);
+  assert.deepEqual(draft.properties.mode.enum, ["create", "extract"]);
+  assert.equal(draft.properties.tags.maxItems, 16);
+
+  assert.equal(profile.additionalProperties, false);
+  assert.deepEqual(profile.properties.scope.enum, [
+    "diary",
+    "calendar",
+    "feed",
+    "forum",
+    "mail",
+    "phone",
+    "live",
+    "assistant",
+  ]);
+  assert.equal(profile.properties.instruction.maxLength, 4000);
+});

@@ -1,4 +1,4 @@
-name: MC1 contract checks
+name: Mobile Chat checks
 
 on:
   push:
@@ -15,5 +15,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.11"
       - run: npm run check
       - run: npm test
+      - run: uv lock --check
+      - run: uv run --locked ruff check .
+      - run: uv run --locked pytest
+      - run: uv build --wheel --out-dir dist
+      - run: uv venv .smoke-venv --python 3.11
+      - run: uv pip install --python .smoke-venv/bin/python dist/*.whl
+      - run: .smoke-venv/bin/python -I -X utf8 tests/stdio_smoke.py

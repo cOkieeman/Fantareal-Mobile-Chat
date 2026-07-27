@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fantareal.local/schemas/mobile-chat/notification.schema.json",
+  "title": "Fantareal Mobile Chat Notification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "notificationId",
+    "title",
+    "content",
+    "source",
+    "sourceId",
+    "isRead",
+    "createdAt"
+  ],
+  "properties": {
+    "notificationId": {
+      "type": "string",
+      "pattern": "^notification_[A-Za-z0-9._-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "content": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "source": {
+      "enum": [
+        "system",
+        "diary",
+        "calendar",
+        "feed",
+        "forum",
+        "mail",
+        "phone",
+        "live",
+        "import"
+      ]
+    },
+    "sourceId": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "isRead": {
+      "type": "boolean"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

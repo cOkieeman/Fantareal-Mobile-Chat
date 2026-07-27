@@ -54,7 +54,7 @@ test("manifest matches the Host API 1.2 application-window contract", async () =
   await access(path.join(root, manifest.entrypoints.page.path));
   await access(path.join(root, manifest.entrypoints.service.lockfile));
 });
-test("manifest requests only the generic capabilities needed by MC3 and MC4", async () => {
+test("manifest requests only the generic capabilities needed through MC6", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const serialized = JSON.stringify(manifest);
 

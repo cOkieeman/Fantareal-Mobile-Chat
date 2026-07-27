@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fantareal.local/schemas/mobile-chat/diary-entry.schema.json",
+  "title": "Fantareal Mobile Chat Diary Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entryId",
+    "title",
+    "content",
+    "entryDate",
+    "mood",
+    "authorId",
+    "authorName",
+    "tags",
+    "source",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "entryId": {
+      "type": "string",
+      "pattern": "^diary_[A-Za-z0-9._-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000
+    },
+    "entryDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "mood": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "authorId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "authorName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40
+      }
+    },
+    "source": {
+      "enum": ["manual", "model", "import"]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

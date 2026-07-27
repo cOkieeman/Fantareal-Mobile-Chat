@@ -6,6 +6,7 @@
   const byId = (id) => document.getElementById(id);
   const screens = Array.from(document.querySelectorAll("[data-screen]"));
   const navigation = byId("app-navigation");
+  let featureControllers = [];
   const elements = {
     status: byId("fixture-status"),
     clock: byId("clock"),
@@ -66,8 +67,7 @@
     activeGroupId: null,
     ready: false,
     syncing: false,
-    busy: false,
-    cancelRequested: false,
+    generation: null,
     editingGroupId: null,
     importPreview: null,
     retry: null,
@@ -110,7 +110,7 @@
       llm_http_error: "模型服务返回错误，请检查模型配置。",
       llm_response_invalid: "模型响应格式无效，请重试。",
       service_parse_failed: "模型返回内容无法解析，请重试。",
-      service_generation_busy: "该群聊已有生成请求。",
+      service_generation_busy: "已有生成请求正在进行。",
       service_context_stale: "当前角色已变化，正在重新载入。",
       chat_context_changed: "当前角色或主会话已变化，正在重新载入。",
       permission_denied: "小手机缺少所需权限，请重新安装并确认授权。",
@@ -122,6 +122,65 @@
   function isContextFailure(error) {
     return ["service_context_stale", "chat_context_changed", "session_invalid"].includes(errorCode(error));
   }
+
+  function generationBusy() {
+    return state.generation !== null;
+  }
+
+  function ownsGeneration(owner) {
+    return state.generation?.owner === owner;
+  }
+
+  function renderGenerationSurfaces() {
+    render();
+    for (const controller of featureControllers) controller.renderGeneration();
+  }
+
+  const generationCoordinator = Object.freeze({
+    begin(owner) {
+      if (generationBusy()) return false;
+      state.generation = { owner, cancelRequested: false };
+      renderGenerationSurfaces();
+      return true;
+    },
+    finish(owner) {
+      if (!ownsGeneration(owner)) return;
+      state.generation = null;
+      renderGenerationSurfaces();
+    },
+    isBusy: generationBusy,
+    isOwner: ownsGeneration,
+    isCancelled(owner) {
+      return ownsGeneration(owner) && state.generation.cancelRequested;
+    },
+    requestCancel(owner) {
+      if (!ownsGeneration(owner) || state.generation.cancelRequested) return false;
+      state.generation.cancelRequested = true;
+      renderGenerationSurfaces();
+      return true;
+    },
+    restore(owner) {
+      if (!ownsGeneration(owner)) return;
+      state.generation.cancelRequested = false;
+      renderGenerationSurfaces();
+    },
+    async generate(request) {
+      if (!host || typeof host.generate !== "function") {
+        const error = new Error("Fantareal Host 模型桥接不可用");
+        error.code = "host_bridge_unavailable";
+        throw error;
+      }
+      return host.generate(request);
+    },
+    async cancel() {
+      if (!host || typeof host.cancelGenerate !== "function") {
+        const error = new Error("Fantareal Host 不支持停止生成");
+        error.code = "host_bridge_unavailable";
+        throw error;
+      }
+      return host.cancelGenerate();
+    },
+  });
 
   function setNotice(message, tone = "neutral") {
     state.notice = message;
@@ -198,6 +257,8 @@
         trigger.removeAttribute("aria-current");
       }
     }
+    for (const controller of featureControllers) controller.open(screenId);
+    renderIdentity();
   }
 
   function setChatView(view) {
@@ -301,20 +362,23 @@
       ? `${names.length} 位角色 · ${names.join("、") || "无可用角色"}`
       : "等待群聊";
     const hasGroup = Boolean(group);
-    elements.editGroup.disabled = !state.ready || state.busy || !hasGroup;
-    elements.clearMessages.disabled = !state.ready || state.busy || !hasGroup || state.messages.length === 0;
-    elements.messageInput.disabled = !state.ready || state.busy || !hasGroup;
-    elements.continueChat.disabled = !state.ready || state.busy || !hasGroup;
-    elements.sendMessage.disabled = !state.ready || state.busy || !hasGroup || !elements.messageInput.value.trim();
-    elements.stopGeneration.hidden = !state.busy;
-    elements.sendMessage.hidden = state.busy;
+    const busy = generationBusy();
+    elements.editGroup.disabled = !state.ready || busy || !hasGroup;
+    elements.clearMessages.disabled = !state.ready || busy || !hasGroup || state.messages.length === 0;
+    elements.messageInput.disabled = !state.ready || busy || !hasGroup;
+    elements.continueChat.disabled = !state.ready || busy || !hasGroup;
+    elements.sendMessage.disabled = !state.ready || busy || !hasGroup || !elements.messageInput.value.trim();
+    elements.stopGeneration.hidden = !ownsGeneration("chat");
+    elements.sendMessage.hidden = ownsGeneration("chat");
     renderMessages();
   }
 
   function renderGeneration() {
-    if (state.busy) {
+    if (ownsGeneration("chat")) {
       elements.generationState.hidden = false;
-      elements.generationLabel.textContent = state.cancelRequested ? "正在停止生成…" : "角色正在回复…";
+      elements.generationLabel.textContent = state.generation.cancelRequested
+        ? "正在停止生成…"
+        : "角色正在回复…";
       elements.retryGeneration.hidden = true;
       return;
     }
@@ -328,14 +392,36 @@
     elements.retryGeneration.hidden = true;
   }
 
-  function render() {
+  function screenLabel(screenId) {
+    return {
+      chat: "口袋群聊",
+      diary: "角色日记",
+      calendar: "角色日程",
+      feed: "角色动态",
+      forum: "角色论坛",
+      mail: "角色邮箱",
+      notifications: "通知",
+      phone: "模拟电话",
+      live: "模拟直播",
+      assistant: "人物辅助",
+      workbench: "Prompt 调试台",
+      home: "应用桌面",
+    }[screenId] || "小手机";
+  }
+
+  function renderIdentity() {
     const activeName = state.characterContext?.activeCharacter?.name;
     elements.identitySubtitle.textContent = state.ready
-      ? `${activeName || "当前角色"} · 口袋群聊`
+      ? `${activeName || "当前角色"} · ${screenLabel(state.screen)}`
       : "正在连接当前角色…";
-    elements.createGroup.disabled = !state.ready || state.busy;
-    elements.createFirstGroup.disabled = !state.ready || state.busy;
-    elements.importGroups.disabled = !state.ready || state.busy;
+  }
+
+  function render() {
+    renderIdentity();
+    const busy = generationBusy();
+    elements.createGroup.disabled = !state.ready || busy;
+    elements.createFirstGroup.disabled = !state.ready || busy;
+    elements.importGroups.disabled = !state.ready || busy;
     renderHomeBoundary();
     renderGroups();
     renderConversation();
@@ -406,7 +492,7 @@
   }
 
   async function syncContext({ quiet = false } = {}) {
-    if (state.syncing || state.busy) return;
+    if (state.syncing || generationBusy()) return;
     if (
       !host
       || typeof host.getContext !== "function"
@@ -437,6 +523,13 @@
       state.context = bound.context;
       state.groups = bound.groups || [];
       state.ready = true;
+      await Promise.all(
+        featureControllers.map((controller) => controller.bindContext(
+          bound.context,
+          resolved.activeCharacter,
+          resolved.characters,
+        )),
+      );
       if (contextChanged || !state.groups.some((group) => group.groupId === state.activeGroupId)) {
         state.retry = null;
         state.activeGroupId = state.groups[0]?.groupId || null;
@@ -449,6 +542,9 @@
       state.groups = [];
       state.messages = [];
       state.activeGroupId = null;
+      await Promise.all(
+        featureControllers.map((controller) => controller.bindContext(null, null, [])),
+      ).catch(() => {});
       setNotice(errorMessage(error), "error");
     } finally {
       state.syncing = false;
@@ -457,7 +553,7 @@
   }
 
   async function openGroup(groupId, moveFocus = false) {
-    if (!state.ready || state.busy) return;
+    if (!state.ready || generationBusy()) return;
     state.activeGroupId = groupId;
     state.retry = null;
     setChatView("conversation");
@@ -475,7 +571,9 @@
   function resizeComposer() {
     elements.messageInput.style.height = "auto";
     elements.messageInput.style.height = `${Math.min(elements.messageInput.scrollHeight, 96)}px`;
-    elements.sendMessage.disabled = state.busy || !state.activeGroupId || !elements.messageInput.value.trim();
+    elements.sendMessage.disabled = generationBusy()
+      || !state.activeGroupId
+      || !elements.messageInput.value.trim();
   }
 
   function characterOptionsForGroup(group) {
@@ -731,7 +829,7 @@
 
   async function runGeneration(mode, content = "") {
     const group = activeGroup();
-    if (!state.ready || state.busy || !group || !state.context) return;
+    if (!state.ready || generationBusy() || !group || !state.context) return;
     if (mode === "user_message" && !content.trim()) return;
 
     const operation = {
@@ -740,10 +838,8 @@
       content: content.trim(),
       context: { ...state.context },
     };
-    state.busy = true;
-    state.cancelRequested = false;
+    if (!generationCoordinator.begin("chat")) return;
     state.retry = null;
-    render();
 
     let operationId = null;
     let resyncAfter = false;
@@ -760,7 +856,7 @@
         renderMessages();
       }
 
-      const generated = await host.generate(prepared.request);
+      const generated = await generationCoordinator.generate(prepared.request);
       await invokeService("mobile.chat.commit", {
         context: operation.context,
         operationId,
@@ -771,7 +867,8 @@
         setNotice("角色回复已保存", "success");
       }
     } catch (error) {
-      const reason = state.cancelRequested || errorCode(error) === "llm_cancelled"
+      const reason = generationCoordinator.isCancelled("chat")
+        || errorCode(error) === "llm_cancelled"
         ? "cancelled"
         : errorCode(error) === "llm_timeout"
           ? "timeout"
@@ -797,23 +894,18 @@
       }
       resyncAfter = isContextFailure(error);
     } finally {
-      state.busy = false;
-      state.cancelRequested = false;
-      render();
+      generationCoordinator.finish("chat");
       if (resyncAfter) await syncContext();
     }
   }
 
   async function stopGeneration() {
-    if (!state.busy || state.cancelRequested) return;
-    state.cancelRequested = true;
-    renderGeneration();
+    if (!generationCoordinator.requestCancel("chat")) return;
     try {
-      await host.cancelGenerate();
+      await generationCoordinator.cancel();
     } catch (error) {
-      state.cancelRequested = false;
+      generationCoordinator.restore("chat");
       setNotice(`停止生成失败：${errorMessage(error)}`, "error");
-      renderGeneration();
     }
   }
 
@@ -831,8 +923,8 @@
     setTheme(root.dataset.theme === "mist" ? "midnight" : "mist");
   });
   byId("close-extension").addEventListener("click", async () => {
-    if (state.busy && typeof host?.cancelGenerate === "function") {
-      await host.cancelGenerate().catch(() => {});
+    if (generationBusy()) {
+      await generationCoordinator.cancel().catch(() => {});
     }
     if (host && typeof host.close === "function") {
       setNotice("正在关闭 Extension session…");
@@ -878,11 +970,27 @@
   });
 
   window.addEventListener("focus", () => {
-    if (!state.busy) void syncContext({ quiet: true });
+    if (!generationBusy()) void syncContext({ quiet: true });
   });
 
   updateClock();
   window.setInterval(updateClock, 30_000);
+  const controllerDependencies = {
+    invokeService,
+    setNotice,
+    errorMessage,
+    errorCode,
+    isContextFailure,
+    syncContext,
+    confirmAction: askForConfirmation,
+    generation: generationCoordinator,
+  };
+  featureControllers = [
+    window.MobileChatLightApps?.createController(controllerDependencies),
+    window.MobileChatSocialApps?.createController(controllerDependencies),
+    window.MobileChatMailApps?.createController(controllerDependencies),
+    window.MobileChatMc6Apps?.createController(controllerDependencies),
+  ].filter(Boolean);
   showScreen(state.screen, false);
   setPresentation(state.presentation);
   setTheme(root.dataset.theme);

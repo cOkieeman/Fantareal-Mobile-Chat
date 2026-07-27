@@ -4,6 +4,7 @@ Thumbs.db
 .vscode/
 node_modules/
 .venv/
+.smoke-venv-*/
 .build-audit/
 coverage/
 dist/
