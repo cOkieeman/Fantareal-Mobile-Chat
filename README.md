@@ -1,6 +1,6 @@
 # Fantareal Mobile Chat
 
-Fantareal 新 PC 的“小手机”Extension。MC1–MC6 已合并；MC7–MC8 接入 Host 受管低频自动活动与用户自有资源包。
+Fantareal 新 PC 的“小手机”Extension。`0.9.0-rc.1` 是完成 MC1–MC9 生命周期验证的首个预发布候选版。
 
 ## 当前范围
 
@@ -25,7 +25,10 @@ npm test
 uv lock --check
 uv run --locked ruff check .
 uv run --locked python -X utf8 -m pytest
+uv run --locked python tools/build_release.py --output-dir dist
 ```
+
+最后一条命令会生成不包含测试、缓存、用户数据或第三方素材的可复现 Extension ZIP，并同时写出 SHA-256 文件。CI 还会构建 wheel，在 Python 3.11 隔离环境中运行 stdio smoke，并把三类产物作为同一 workflow artifact 上传。
 
 ## 在 Fantareal 中安装
 
@@ -39,6 +42,17 @@ uv run --locked python -X utf8 -m pytest
 8. 创建群聊并管理成员，验证用户发送、角色续聊、停止生成、失败重试和清空消息。
 9. 打开“自动活动”，验证默认关闭、启用/暂停、间隔、立即运行、取消与角色切换后重新绑定。
 10. 选择旧版小手机数据目录，先核对导入预览，再确认合并或替换。
+
+## 安装与生命周期
+
+- 本地目录安装选择仓库根目录或解压后的 `Fantareal-Mobile-Chat-<version>/`。
+- GitHub URL 安装使用 `https://github.com/cOkieeman/Fantareal-Mobile-Chat`；Host 固定解析出的 commit，不跟随未确认的新提交。
+- 同权限 update 可直接准备；新增权限必须再次确认，拒绝后保留当前 active package。
+- manifest 损坏或内容校验失败的 update 不得替换当前 package。
+- rollback 只切换 package 历史，保留已授权的 namespaced storage（本插件当前为 data 和 assets）。
+- disable/enable 保留安装记录与持久化数据；uninstall 删除 package，但保留用户数据，后续清理必须由用户显式执行。
+
+当前 RC 只生成 CI artifact，不会由 workflow 自动创建 GitHub Release。tag、预发布 Release 和镜像同步需要人工审批。
 
 ## 数据与素材边界
 

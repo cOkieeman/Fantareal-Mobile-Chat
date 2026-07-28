@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdir, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -48,4 +48,25 @@ test("repository contains no private runtime files, generated Python files, or l
     assert.doesNotMatch(relative, /(^|\/)(stickers?|models?|logs?)(\/|$)/i);
     assert.ok(info.size < 1024 * 1024, `unexpected file larger than 1 MiB: ${relative}`);
   }
+});
+
+test("release versions stay aligned across Extension, npm and Python surfaces", async () => {
+  const manifest = JSON.parse(await readFile(path.join(root, "fantareal-extension.json"), "utf8"));
+  const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+  const pyproject = await readFile(path.join(root, "pyproject.toml"), "utf8");
+  const initSource = await readFile(
+    path.join(root, "src", "fantareal_mobile_chat", "__init__.py"),
+    "utf8",
+  );
+  const serviceSource = await readFile(
+    path.join(root, "src", "fantareal_mobile_chat", "service.py"),
+    "utf8",
+  );
+  const pythonVersion = manifest.version.replace(/-rc\.(\d+)$/, "rc$1");
+
+  assert.equal(packageJson.version, manifest.version);
+  assert.match(pyproject, new RegExp(`^version = "${pythonVersion}"$`, "m"));
+  assert.match(initSource, new RegExp(`^__version__ = "${pythonVersion}"$`, "m"));
+  assert.match(serviceSource, new RegExp(`"version": "${pythonVersion}"`));
+  assert.match(manifest.version, /^\d+\.\d+\.\d+-rc\.\d+$/);
 });
