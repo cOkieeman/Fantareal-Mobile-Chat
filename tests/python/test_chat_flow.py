@@ -56,6 +56,83 @@ def test_prepare_commit_is_atomic_and_builds_host_llm_request(
     assert [item["content"] for item in stored] == ["Are you still there?", "I am here."]
 
 
+def test_group_prompt_only_contains_member_roles_host_chat_and_workbench(
+    service: MobileChatService,
+) -> None:
+    alice = character()
+    bob = character("card_b", "Bob")
+    carol = character("card_c", "Carol")
+    service.dispatch(
+        "mobile.context.bind",
+        {
+            "context": context(),
+            "activeCharacter": alice,
+            "characters": [alice, bob, carol],
+            "chatContext": {
+                "available": True,
+                "recentMessages": [
+                    {
+                        "messageId": "host-message-secret",
+                        "role": "assistant",
+                        "content": "HOST_GROUP_STORY_MARKER",
+                    }
+                ],
+            },
+        },
+    )
+    group_id = create_group(
+        service,
+        {
+            "title": "Bob only",
+            "description": "Only Bob may answer.",
+            "members": [
+                {
+                    "roleId": "user",
+                    "displayName": "Me",
+                    "kind": "user",
+                    "summary": "",
+                },
+                {
+                    "roleId": "card_b",
+                    "displayName": "Bob",
+                    "kind": "character",
+                    "summary": "calm",
+                },
+            ],
+            "replyCount": 1,
+            "allowRoleToRoleReply": True,
+        },
+    )
+    service.dispatch(
+        "mobile.workbench.update",
+        {
+            "context": context(),
+            "profile": {
+                "scope": "group_chat",
+                "enabled": True,
+                "instruction": "GROUP_WORKBENCH_MARKER",
+            },
+        },
+    )
+
+    prepared = service.dispatch(
+        "mobile.chat.prepare",
+        {
+            "context": context(),
+            "groupId": group_id,
+            "content": "Hello Bob",
+        },
+    )
+    request_text = str(prepared["request"])
+
+    assert "Bob description" in request_text
+    assert "HOST_GROUP_STORY_MARKER" in request_text
+    assert "GROUP_WORKBENCH_MARKER" in request_text
+    assert "Alice description" not in request_text
+    assert "Carol description" not in request_text
+    assert "host-message-secret" not in request_text
+
+
 def test_parse_failure_then_abort_persists_user_and_retryable_error(
     service: MobileChatService,
     group_payload: dict[str, Any],

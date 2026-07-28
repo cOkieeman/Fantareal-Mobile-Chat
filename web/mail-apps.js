@@ -41,6 +41,8 @@
       compose: byId("compose-mail"),
       allFilter: byId("mail-filter-all"),
       unreadFilter: byId("mail-filter-unread"),
+      draftFilter: byId("mail-filter-draft"),
+      search: byId("mail-search-input"),
       composeDialog: byId("mail-compose-dialog"),
       composeForm: byId("mail-compose-form"),
       recipient: byId("mail-recipient-input"),
@@ -62,6 +64,8 @@
       characters: [],
       threads: [],
       filter: "all",
+      search: "",
+      draft: { recipientId: "", subject: "", content: "" },
       activeThreadId: null,
       loading: false,
     };
@@ -79,17 +83,44 @@
     }
 
     function filteredThreads() {
-      return state.filter === "unread"
+      const query = state.search.trim().toLocaleLowerCase("zh-CN");
+      const rows = state.filter === "unread"
         ? state.threads.filter((thread) => !thread.isRead)
-        : state.threads;
+        : state.filter === "draft"
+          ? []
+          : state.threads;
+      if (!query) return rows;
+      return rows.filter((thread) => [
+        thread.subject,
+        thread.counterpartyName,
+        ...thread.messages.map((message) => message.content),
+      ].join(" ").toLocaleLowerCase("zh-CN").includes(query));
     }
 
     function renderThreads() {
       nodes.list.replaceChildren();
+      const hasDraft = Boolean(state.draft.subject.trim() || state.draft.content.trim());
+      if (state.filter === "draft" && hasDraft) {
+        const draftCard = element("li", "mail-card mail-draft-card");
+        const openDraft = element("button", "mail-card-open");
+        openDraft.type = "button";
+        openDraft.dataset.openDraft = "true";
+        openDraft.append(
+          element("span", "mail-avatar", "稿"),
+          element("span", "mail-card-copy"),
+          element("span", "mail-unread-dot", "草稿"),
+        );
+        openDraft.querySelector(".mail-card-copy").append(
+          element("span", "", state.draft.subject || "无主题"),
+          element("small", "", state.draft.content || "尚未填写正文"),
+        );
+        draftCard.append(openDraft);
+        nodes.list.append(draftCard);
+      }
       for (const thread of filteredThreads()) {
         const card = element(
           "li",
-          `light-app-card mail-card${thread.isRead ? "" : " unread"}`,
+          `mail-card${thread.isRead ? "" : " unread"}`,
         );
         const open = element("button", "mail-card-open");
         open.type = "button";
@@ -121,13 +152,16 @@
       }
       const unread = state.threads.filter((thread) => !thread.isRead).length;
       nodes.count.textContent = `${unread} 封未读 · 共 ${state.threads.length} 个线程`;
-      nodes.allFilter.textContent = `全部 ${state.threads.length}`;
+      nodes.allFilter.textContent = `收件箱 ${state.threads.length}`;
       nodes.unreadFilter.textContent = `未读 ${unread}`;
+      nodes.draftFilter.textContent = `草稿 ${hasDraft ? 1 : 0}`;
       nodes.allFilter.classList.toggle("is-active", state.filter === "all");
       nodes.unreadFilter.classList.toggle("is-active", state.filter === "unread");
+      nodes.draftFilter.classList.toggle("is-active", state.filter === "draft");
       const visible = filteredThreads();
-      nodes.empty.hidden = visible.length > 0;
-      nodes.list.hidden = visible.length === 0;
+      const draftVisible = state.filter === "draft" && hasDraft;
+      nodes.empty.hidden = visible.length > 0 || draftVisible;
+      nodes.list.hidden = visible.length === 0 && !draftVisible;
     }
 
     function renderThreadDialog() {
@@ -205,6 +239,9 @@
       if (changed) {
         state.threads = [];
         state.activeThreadId = null;
+        state.filter = "all";
+        state.search = "";
+        state.draft = { recipientId: "", subject: "", content: "" };
       }
       renderAll();
       if (state.context) await load();
@@ -218,8 +255,9 @@
         option.textContent = character.name || "未命名角色";
         nodes.recipient.append(option);
       }
-      nodes.subject.value = "";
-      nodes.content.value = "";
+      nodes.recipient.value = state.draft.recipientId || nodes.recipient.value;
+      nodes.subject.value = state.draft.subject;
+      nodes.content.value = state.draft.content;
       nodes.composeError.hidden = true;
       nodes.composeDialog.showModal();
       nodes.subject.focus();
@@ -236,6 +274,7 @@
           content: nodes.content.value.trim(),
         },
         onCommitted: async () => {
+          state.draft = { recipientId: "", subject: "", content: "" };
           nodes.composeDialog.close();
           await load();
         },
@@ -338,7 +377,28 @@
       state.filter = "unread";
       renderAll();
     });
+    nodes.draftFilter.addEventListener("click", () => {
+      state.filter = "draft";
+      renderAll();
+    });
+    nodes.search.addEventListener("input", () => {
+      state.search = nodes.search.value;
+      renderAll();
+    });
+    for (const input of [nodes.recipient, nodes.subject, nodes.content]) {
+      input.addEventListener("input", () => {
+        state.draft = {
+          recipientId: nodes.recipient.value,
+          subject: nodes.subject.value,
+          content: nodes.content.value,
+        };
+      });
+    }
     nodes.list.addEventListener("click", (event) => {
+      if (event.target.closest("[data-open-draft]")) {
+        openCompose();
+        return;
+      }
       const button = event.target.closest("[data-thread-id]");
       if (button) void openThread(button.dataset.threadId);
     });

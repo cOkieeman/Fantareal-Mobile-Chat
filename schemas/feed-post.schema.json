@@ -6,10 +6,13 @@
   "additionalProperties": false,
   "required": [
     "postId",
+    "title",
     "content",
     "authorId",
     "authorName",
+    "eventType",
     "tags",
+    "metadata",
     "liked",
     "likeCount",
     "source",
@@ -18,14 +21,28 @@
   ],
   "properties": {
     "postId": {"type": "string", "pattern": "^feed_[A-Za-z0-9._-]{6,155}$"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 120},
     "content": {"type": "string", "minLength": 1, "maxLength": 2000},
     "authorId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$"},
     "authorName": {"type": "string", "minLength": 1, "maxLength": 120},
+    "eventType": {"type": "string", "minLength": 1, "maxLength": 60},
     "tags": {
       "type": "array",
       "maxItems": 12,
       "uniqueItems": true,
       "items": {"type": "string", "minLength": 1, "maxLength": 40}
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mood", "location", "mediaHint", "views", "commentCount"],
+      "properties": {
+        "mood": {"type": "string", "maxLength": 80},
+        "location": {"type": "string", "maxLength": 120},
+        "mediaHint": {"type": "string", "maxLength": 240},
+        "views": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "commentCount": {"type": "integer", "minimum": 0, "maximum": 1000000}
+      }
     },
     "liked": {"type": "boolean"},
     "likeCount": {"type": "integer", "minimum": 0, "maximum": 1000000},

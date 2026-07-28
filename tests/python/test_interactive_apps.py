@@ -206,6 +206,8 @@ def test_live_start_tick_message_like_end_and_delete(
     assert stream["status"] == "live"
     assert started["notification"]["source"] == "live"
     assert stream["messages"][0]["authorType"] == "viewer"
+    assert stream["fanCount"] == 0
+    assert stream["innerThought"] == ""
 
     messaged = service.dispatch(
         "mobile.live.message.create",
@@ -238,12 +240,16 @@ def test_live_start_tick_message_like_end_and_delete(
                 messages=[],
                 viewerCount=9,
                 likeCount=1,
+                fanCount=28,
+                innerThought="希望这段故事能让大家安静一点。",
                 status="live",
             ),
         },
     )["stream"]
     assert updated["viewerCount"] == 9
     assert updated["likeCount"] == 3
+    assert updated["fanCount"] == 28
+    assert updated["innerThought"] == "希望这段故事能让大家安静一点。"
     assert len(updated["segments"]) == 2
 
     ended = service.dispatch(

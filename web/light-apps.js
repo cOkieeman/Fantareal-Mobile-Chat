@@ -24,6 +24,7 @@
       errorCode,
       isContextFailure,
       syncContext,
+      openScreen,
       confirmAction,
       generation,
     } = dependencies;
@@ -31,6 +32,9 @@
       diaryCount: byId("diary-count"),
       diaryList: byId("diary-list"),
       diaryEmpty: byId("diary-empty"),
+      diaryRoles: byId("diary-role-list"),
+      diaryOwner: byId("diary-book-owner"),
+      diaryBookCount: byId("diary-book-count"),
       diaryDialog: byId("diary-dialog"),
       diaryForm: byId("diary-form"),
       diaryDialogTitle: byId("diary-dialog-title"),
@@ -40,11 +44,27 @@
       diaryContent: byId("diary-content-input"),
       diaryError: byId("diary-form-error"),
       deleteDiary: byId("delete-diary"),
+      diaryDetailDialog: byId("diary-detail-dialog"),
+      diaryDetailTitle: byId("diary-detail-title"),
+      diaryDetailDate: byId("diary-detail-date"),
+      diaryDetailMood: byId("diary-detail-mood"),
+      diaryDetailAuthor: byId("diary-detail-author"),
+      diaryDetailContent: byId("diary-detail-content"),
+      diaryDetailTags: byId("diary-detail-tags"),
+      editDiaryFromDetail: byId("edit-diary-from-detail"),
       generateDiary: byId("generate-diary"),
       stopDiaryGeneration: byId("stop-diary-generation"),
       calendarCount: byId("calendar-count"),
       calendarList: byId("calendar-list"),
       calendarEmpty: byId("calendar-empty"),
+      calendarGrid: byId("calendar-grid"),
+      calendarMonthLabel: byId("calendar-month-label"),
+      calendarPreviousMonth: byId("calendar-previous-month"),
+      calendarNextMonth: byId("calendar-next-month"),
+      calendarDayLabel: byId("calendar-day-label"),
+      calendarDayCount: byId("calendar-day-count"),
+      calendarAgendaList: byId("calendar-agenda-list"),
+      calendarAgendaCount: byId("calendar-agenda-count"),
       calendarDialog: byId("calendar-dialog"),
       calendarForm: byId("calendar-form"),
       calendarDialogTitle: byId("calendar-dialog-title"),
@@ -59,6 +79,7 @@
       generateCalendar: byId("generate-calendar"),
       stopCalendarGeneration: byId("stop-calendar-generation"),
       notificationsCount: byId("notifications-count"),
+      notificationsUnreadCount: byId("notifications-unread-count"),
       notificationsList: byId("notifications-list"),
       notificationsEmpty: byId("notifications-empty"),
       readAllNotifications: byId("read-all-notifications"),
@@ -72,7 +93,12 @@
       calendar: [],
       notifications: [],
       editingDiaryId: null,
+      viewingDiaryId: null,
       editingCalendarId: null,
+      selectedDiaryRoleId: null,
+      selectedCalendarDate: today(),
+      calendarMonth: today().slice(0, 7),
+      notificationFilter: "all",
       loading: false,
     };
     const generated = window.MobileChatGeneratedApp.createRunner({
@@ -101,30 +127,53 @@
     }
 
     function renderDiary() {
+      const selected = state.characters.find((item) => item.cardUid === state.selectedDiaryRoleId)
+        || state.activeCharacter;
+      const rows = state.diary.filter((entry) => (
+        !selected || entry.authorId === selected.cardUid
+      ));
+      nodes.diaryRoles.replaceChildren();
+      for (const character of state.characters) {
+        const button = element("button", "diary-role");
+        button.type = "button";
+        button.dataset.diaryRoleId = character.cardUid;
+        button.classList.toggle("is-active", character.cardUid === selected?.cardUid);
+        button.append(
+          element("span", "diary-role-avatar", String(character.name || "角").slice(0, 1)),
+          element("span", "", character.name || "未命名角色"),
+        );
+        nodes.diaryRoles.append(button);
+      }
       nodes.diaryList.replaceChildren();
-      for (const entry of state.diary) {
-        const card = element("li", "light-app-card");
-        const main = element("article", "light-app-card-main");
+      for (const entry of rows) {
+        const card = element("li", "diary-entry-card");
+        const main = element("button", "diary-entry-open");
+        main.type = "button";
+        main.dataset.action = "view";
+        main.dataset.id = entry.entryId;
+        main.setAttribute("aria-label", `阅读全文：${entry.title}`);
         const heading = element("div");
         heading.append(
-          element("strong", "", entry.title),
           element("time", "", entry.entryDate),
+          element("span", "diary-mood", entry.mood || "日常"),
         );
-        const meta = element("div", "light-app-card-meta");
-        if (entry.mood) meta.append(element("span", "", entry.mood));
-        meta.append(element("span", "", entry.authorName));
-        for (const tag of entry.tags || []) meta.append(element("span", "", `#${tag}`));
-        main.append(heading, element("p", "", entry.content), meta);
-        const actions = element("div", "light-app-card-actions");
+        main.append(
+          heading,
+          element("strong", "", entry.title),
+          element("p", "", entry.content),
+        );
+        const actions = element("div", "diary-entry-actions");
         actions.append(
-          actionButton("edit", entry.entryId, `编辑日记：${entry.title}`, "✎"),
-          actionButton("delete", entry.entryId, `删除日记：${entry.title}`, "⌫"),
+          actionButton("edit", entry.entryId, `编辑日记：${entry.title}`, "编辑"),
+          actionButton("delete", entry.entryId, `删除日记：${entry.title}`, "删除"),
         );
         card.append(main, actions);
         nodes.diaryList.append(card);
       }
-      nodes.diaryEmpty.hidden = state.diary.length > 0;
-      nodes.diaryList.hidden = state.diary.length === 0;
+      nodes.diaryOwner.textContent = `${selected?.name || "当前角色"}的日记`;
+      nodes.diaryBookCount.textContent = `${rows.length} 篇`;
+      nodes.diaryEmpty.hidden = rows.length > 0;
+      nodes.diaryList.hidden = rows.length === 0;
     }
 
     function statusLabel(status) {
@@ -135,33 +184,102 @@
       }[status] || status;
     }
 
+    function upcomingCalendarEvents() {
+      const start = new Date(`${today()}T00:00:00`);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+      return state.calendar
+        .filter((event) => {
+          const date = new Date(`${event.startsOn}T00:00:00`);
+          return event.status === "planned" && date >= start && date < end;
+        })
+        .sort((left, right) => (
+          left.startsOn.localeCompare(right.startsOn)
+          || left.title.localeCompare(right.title, "zh-CN")
+        ));
+    }
+
     function renderCalendar() {
-      nodes.calendarList.replaceChildren();
+      const [yearText, monthText] = state.calendarMonth.split("-");
+      const year = Number(yearText);
+      const month = Number(monthText) - 1;
+      const firstDay = new Date(year, month, 1).getDay();
+      const days = new Date(year, month + 1, 0).getDate();
+      const byDate = new Map();
       for (const event of state.calendar) {
-        const card = element("li", "light-app-card");
-        const main = element("article", "light-app-card-main");
+        const rows = byDate.get(event.startsOn) || [];
+        rows.push(event);
+        byDate.set(event.startsOn, rows);
+      }
+      nodes.calendarMonthLabel.textContent = `${year} 年 ${month + 1} 月`;
+      nodes.calendarGrid.replaceChildren();
+      for (let index = 0; index < firstDay; index += 1) {
+        const blank = element("span", "calendar-day is-blank");
+        blank.setAttribute("aria-hidden", "true");
+        nodes.calendarGrid.append(blank);
+      }
+      for (let day = 1; day <= days; day += 1) {
+        const date = `${yearText}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const button = element("button", "calendar-day");
+        button.type = "button";
+        button.dataset.calendarDate = date;
+        button.classList.toggle("is-active", date === state.selectedCalendarDate);
+        button.classList.toggle("has-events", byDate.has(date));
+        button.append(element("strong", "", String(day)));
+        if (byDate.has(date)) button.append(element("span", "calendar-dot", ""));
+        nodes.calendarGrid.append(button);
+      }
+      const dayRows = byDate.get(state.selectedCalendarDate) || [];
+      const agendaRows = upcomingCalendarEvents();
+      nodes.calendarAgendaList.replaceChildren();
+      for (const event of agendaRows.slice(0, 6)) {
+        const item = element("li");
+        const open = element("button");
+        open.type = "button";
+        open.dataset.calendarDate = event.startsOn;
+        const date = new Date(`${event.startsOn}T00:00:00`);
+        const weekday = new Intl.DateTimeFormat("zh-CN", {
+          month: "numeric",
+          day: "numeric",
+          weekday: "short",
+        }).format(date);
+        open.append(
+          element("time", "", weekday),
+          element("strong", "", event.title),
+          element("small", "", event.location || "点击查看当天安排"),
+        );
+        item.append(open);
+        nodes.calendarAgendaList.append(item);
+      }
+      nodes.calendarAgendaCount.textContent = agendaRows.length
+        ? `未来 7 天 · ${agendaRows.length} 项`
+        : "未来 7 天暂无安排";
+      nodes.calendarList.replaceChildren();
+      for (const event of dayRows) {
+        const card = element("li", "calendar-event-card");
+        const main = element("article");
         const heading = element("div");
         heading.append(
           element("strong", "", event.title),
-          element("time", "", event.endsOn
-            ? `${event.startsOn} → ${event.endsOn}`
-            : event.startsOn),
+          element("span", "calendar-event-status", statusLabel(event.status)),
         );
-        const meta = element("div", "light-app-card-meta");
-        meta.append(element("span", "", statusLabel(event.status)));
-        if (event.location) meta.append(element("span", "", event.location));
-        for (const tag of event.tags || []) meta.append(element("span", "", `#${tag}`));
-        main.append(heading, element("p", "", event.description || "没有补充说明。"), meta);
-        const actions = element("div", "light-app-card-actions");
+        main.append(
+          heading,
+          element("p", "", event.description || "没有补充说明。"),
+          element("small", "", [event.location, event.endsOn ? `至 ${event.endsOn}` : ""].filter(Boolean).join(" · ")),
+        );
+        const actions = element("div", "calendar-event-actions");
         actions.append(
-          actionButton("edit", event.eventId, `编辑日程：${event.title}`, "✎"),
-          actionButton("delete", event.eventId, `删除日程：${event.title}`, "⌫"),
+          actionButton("edit", event.eventId, `编辑日程：${event.title}`, "编辑"),
+          actionButton("delete", event.eventId, `删除日程：${event.title}`, "删除"),
         );
         card.append(main, actions);
         nodes.calendarList.append(card);
       }
-      nodes.calendarEmpty.hidden = state.calendar.length > 0;
-      nodes.calendarList.hidden = state.calendar.length === 0;
+      nodes.calendarDayLabel.textContent = `${state.selectedCalendarDate} 当日安排`;
+      nodes.calendarDayCount.textContent = `${dayRows.length} 项`;
+      nodes.calendarEmpty.hidden = dayRows.length > 0;
+      nodes.calendarList.hidden = dayRows.length === 0;
     }
 
     function renderGeneration() {
@@ -189,19 +307,40 @@
       return {
         diary: "日记",
         calendar: "日程",
+        feed: "动态",
+        forum: "论坛",
+        mail: "邮箱",
+        phone: "电话",
+        live: "直播",
         system: "系统",
         import: "导入",
       }[source] || source;
     }
 
+    function notificationTarget(source) {
+      return {
+        diary: "diary",
+        calendar: "calendar",
+        feed: "feed",
+        forum: "forum",
+        mail: "mail",
+        phone: "phone",
+        live: "live",
+      }[source] || null;
+    }
+
     function renderNotifications() {
+      const rows = state.notificationFilter === "unread"
+        ? state.notifications.filter((item) => !item.isRead)
+        : state.notifications;
       nodes.notificationsList.replaceChildren();
-      for (const notification of state.notifications) {
+      for (const notification of rows) {
         const card = element(
           "li",
-          `light-app-card${notification.isRead ? "" : " unread"}`,
+          `notification-row${notification.isRead ? " is-read" : " is-unread"}`,
         );
-        const main = element("article", "light-app-card-main");
+        card.append(element("span", "notification-dot", ""));
+        const main = element("article", "notification-main");
         const heading = element("div");
         heading.append(
           element("strong", "", notification.title),
@@ -213,11 +352,22 @@
             hour12: false,
           })),
         );
-        const meta = element("div", "light-app-card-meta");
+        const meta = element("div", "notification-meta");
         meta.append(element("span", "", sourceLabel(notification.source)));
         if (!notification.isRead) meta.append(element("span", "", "未读"));
         main.append(heading, element("p", "", notification.content || "没有附加内容。"), meta);
-        const actions = element("div", "light-app-card-actions");
+        const actions = element("div", "notification-actions");
+        const target = notificationTarget(notification.source);
+        if (target) {
+          actions.append(
+            actionButton(
+              "open-source",
+              notification.notificationId,
+              `查看${sourceLabel(notification.source)}来源`,
+              "查看",
+            ),
+          );
+        }
         actions.append(
           actionButton(
             "mark",
@@ -230,9 +380,16 @@
         nodes.notificationsList.append(card);
       }
       const unread = state.notifications.filter((item) => !item.isRead).length;
+      nodes.notificationsUnreadCount.textContent = String(unread);
       nodes.notificationsCount.textContent = `${unread} 条未读 · 共 ${state.notifications.length} 条`;
-      nodes.notificationsEmpty.hidden = state.notifications.length > 0;
-      nodes.notificationsList.hidden = state.notifications.length === 0;
+      nodes.notificationsEmpty.hidden = rows.length > 0;
+      nodes.notificationsList.hidden = rows.length === 0;
+      document.querySelectorAll("[data-notification-filter]").forEach((button) => {
+        button.classList.toggle(
+          "is-active",
+          button.dataset.notificationFilter === state.notificationFilter,
+        );
+      });
       nodes.readAllNotifications.disabled = unread === 0;
       nodes.clearNotifications.disabled = state.notifications.length === 0;
     }
@@ -296,6 +453,11 @@
         state.diary = [];
         state.calendar = [];
         state.notifications = [];
+        state.selectedDiaryRoleId = activeCharacter?.cardUid || null;
+        state.viewingDiaryId = null;
+        state.selectedCalendarDate = today();
+        state.calendarMonth = today().slice(0, 7);
+        state.notificationFilter = "all";
       }
       renderAll();
       if (state.context) await load("all");
@@ -315,6 +477,27 @@
       nodes.diaryTitle.focus();
     }
 
+    function openDiaryDetail(entryId) {
+      const entry = state.diary.find((item) => item.entryId === entryId);
+      if (!entry) return;
+      state.viewingDiaryId = entry.entryId;
+      nodes.diaryDetailTitle.textContent = entry.title;
+      nodes.diaryDetailDate.textContent = entry.entryDate;
+      nodes.diaryDetailMood.textContent = entry.mood || "日常";
+      nodes.diaryDetailAuthor.textContent = entry.authorName || "当前角色";
+      nodes.diaryDetailContent.replaceChildren();
+      for (const paragraph of entry.content.split(/\n{2,}/).filter(Boolean)) {
+        nodes.diaryDetailContent.append(element("p", "", paragraph));
+      }
+      nodes.diaryDetailTags.replaceChildren();
+      for (const tag of entry.tags || []) {
+        nodes.diaryDetailTags.append(element("span", "", `#${tag}`));
+      }
+      nodes.diaryDetailTags.hidden = !(entry.tags || []).length;
+      nodes.diaryDetailDialog.showModal();
+      nodes.diaryDetailTitle.focus();
+    }
+
     async function saveDiary(event) {
       event.preventDefault();
       nodes.diaryError.hidden = true;
@@ -323,8 +506,16 @@
         content: nodes.diaryContent.value.trim(),
         entryDate: nodes.diaryDate.value,
         mood: nodes.diaryMood.value.trim(),
-        authorId: state.activeCharacter?.cardUid || state.context?.cardUid,
-        authorName: state.activeCharacter?.name || "当前角色",
+        authorId: (
+          state.characters.find((item) => item.cardUid === state.selectedDiaryRoleId)?.cardUid
+          || state.activeCharacter?.cardUid
+          || state.context?.cardUid
+        ),
+        authorName: (
+          state.characters.find((item) => item.cardUid === state.selectedDiaryRoleId)?.name
+          || state.activeCharacter?.name
+          || "当前角色"
+        ),
         tags: [],
         source: "manual",
       };
@@ -376,7 +567,7 @@
       state.editingCalendarId = calendarEvent?.eventId || null;
       nodes.calendarDialogTitle.textContent = calendarEvent ? "编辑日程" : "新建日程";
       nodes.calendarTitle.value = calendarEvent?.title || "";
-      nodes.calendarStart.value = calendarEvent?.startsOn || today();
+      nodes.calendarStart.value = calendarEvent?.startsOn || state.selectedCalendarDate || today();
       nodes.calendarEnd.value = calendarEvent?.endsOn || "";
       nodes.calendarLocation.value = calendarEvent?.location || "";
       nodes.calendarStatus.value = calendarEvent?.status || "planned";
@@ -507,17 +698,58 @@
       }
     }
 
+    async function openNotificationSource(notificationId) {
+      const notification = state.notifications.find(
+        (item) => item.notificationId === notificationId,
+      );
+      const target = notificationTarget(notification?.source);
+      if (!notification || !target) {
+        setNotice("这条通知没有可打开的来源页面。");
+        return;
+      }
+      if (!notification.isRead) {
+        try {
+          await invokeService("mobile.notifications.mark", {
+            context: state.context,
+            notificationId,
+            isRead: true,
+          });
+          notification.isRead = true;
+        } catch (error) {
+          setNotice(errorMessage(error), "error");
+          if (isContextFailure(error)) await syncContext();
+          return;
+        }
+      }
+      openScreen(target);
+      setNotice(`已打开${sourceLabel(notification.source)}；来源记录会按最新顺序显示。`);
+    }
+
     byId("create-diary").addEventListener("click", () => openDiary());
     byId("create-first-diary").addEventListener("click", () => openDiary());
-    nodes.generateDiary.addEventListener("click", () => void generated.run("diary"));
+    nodes.generateDiary.addEventListener("click", () => void generated.run("diary", {
+      prepareParams: { roleId: state.selectedDiaryRoleId },
+    }));
     nodes.stopDiaryGeneration.addEventListener("click", () => void generated.stop("diary"));
     nodes.diaryForm.addEventListener("submit", (event) => void saveDiary(event));
     nodes.deleteDiary.addEventListener("click", () => void deleteDiary());
     nodes.diaryList.addEventListener("click", (event) => {
       const button = event.target.closest("[data-action]");
       if (!button) return;
+      if (button.dataset.action === "view") openDiaryDetail(button.dataset.id);
       if (button.dataset.action === "edit") openDiary(button.dataset.id);
       if (button.dataset.action === "delete") void deleteDiary(button.dataset.id);
+    });
+    nodes.editDiaryFromDetail.addEventListener("click", () => {
+      const entryId = state.viewingDiaryId;
+      nodes.diaryDetailDialog.close();
+      if (entryId) openDiary(entryId);
+    });
+    nodes.diaryRoles.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-diary-role-id]");
+      if (!button) return;
+      state.selectedDiaryRoleId = button.dataset.diaryRoleId;
+      renderAll();
     });
 
     byId("create-calendar").addEventListener("click", () => openCalendar());
@@ -535,13 +767,50 @@
       if (button.dataset.action === "edit") openCalendar(button.dataset.id);
       if (button.dataset.action === "delete") void deleteCalendar(button.dataset.id);
     });
+    nodes.calendarPreviousMonth.addEventListener("click", () => {
+      const [year, month] = state.calendarMonth.split("-").map(Number);
+      const date = new Date(year, month - 2, 1);
+      state.calendarMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      state.selectedCalendarDate = `${state.calendarMonth}-01`;
+      renderAll();
+    });
+    nodes.calendarNextMonth.addEventListener("click", () => {
+      const [year, month] = state.calendarMonth.split("-").map(Number);
+      const date = new Date(year, month, 1);
+      state.calendarMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      state.selectedCalendarDate = `${state.calendarMonth}-01`;
+      renderAll();
+    });
+    nodes.calendarGrid.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-calendar-date]");
+      if (!button) return;
+      state.selectedCalendarDate = button.dataset.calendarDate;
+      renderAll();
+    });
+    nodes.calendarAgendaList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-calendar-date]");
+      if (!button) return;
+      state.selectedCalendarDate = button.dataset.calendarDate;
+      state.calendarMonth = state.selectedCalendarDate.slice(0, 7);
+      renderAll();
+    });
 
     nodes.notificationsList.addEventListener("click", (event) => {
-      const button = event.target.closest('[data-action="mark"]');
-      if (button) void markNotification(button.dataset.id);
+      const button = event.target.closest("[data-action]");
+      if (!button) return;
+      if (button.dataset.action === "mark") void markNotification(button.dataset.id);
+      if (button.dataset.action === "open-source") {
+        void openNotificationSource(button.dataset.id);
+      }
     });
     nodes.readAllNotifications.addEventListener("click", () => void readAllNotifications());
     nodes.clearNotifications.addEventListener("click", () => void clearNotifications());
+    document.querySelector(".notification-filters").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-notification-filter]");
+      if (!button) return;
+      state.notificationFilter = button.dataset.notificationFilter;
+      renderAll();
+    });
 
     renderAll();
     return {

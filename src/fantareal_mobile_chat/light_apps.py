@@ -16,6 +16,7 @@ from .domain import (
     sequence,
     text,
 )
+from .prompt_context import mobile_prompt_context
 
 DIARY_ID_PREFIX = "diary"
 CALENDAR_ID_PREFIX = "calendar"
@@ -182,6 +183,10 @@ def build_light_app_request(
     purpose: str,
     active_character: dict[str, Any],
     existing: list[dict[str, Any]],
+    *,
+    characters: list[dict[str, Any]] | None = None,
+    groups: list[dict[str, Any]] | None = None,
+    chat_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if purpose not in PROMPTS:
         raise DomainError("invalid_generation_purpose", "不支持的轻应用生成 purpose")
@@ -210,9 +215,23 @@ def build_light_app_request(
             "today": now_iso()[:10],
             "activeCharacter": active_character,
             "existing": compact_existing,
+            "mobile_context": mobile_prompt_context(
+                purpose,
+                active_character,
+                characters=characters,
+                groups=groups,
+                chat_context=chat_context,
+                recent_events=compact_existing,
+            ),
         },
         ensure_ascii=False,
         separators=(",", ":"),
+    )
+    generation_task = (
+        "根据目标角色、时间、群组关系和已有内容生成 4 条未来 7 天内、"
+        "分散在不同日期的新日程。"
+        if purpose == "calendar"
+        else "根据目标角色、时间、群组关系和已有内容生成 1 条新内容。"
     )
     return {
         "purpose": f"mobile-chat.{purpose}",
@@ -221,13 +240,14 @@ def build_light_app_request(
             {
                 "role": "user",
                 "content": (
-                    "根据当前角色资料生成 1 条新内容。不要照抄 existing，也不要虚构用户隐私。"
+                    f"{generation_task}遵守 mobile_context.role_app_policy，不要照抄 existing，"
+                    "也不要补写未提供的主剧情、记忆或用户隐私。"
                     f"\nContext JSON:\n{context}"
                 ),
             },
         ],
         "temperature": 0.8,
-        "maxOutputTokens": 1600 if purpose == "diary" else 1200,
+        "maxOutputTokens": 1600 if purpose == "diary" else 2400,
         "responseFormat": "json_object",
     }
 

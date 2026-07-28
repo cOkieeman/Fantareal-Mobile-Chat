@@ -28,6 +28,7 @@ from .light_apps import (
     normalize_notification,
 )
 from .mail_apps import normalize_mail_message, normalize_mail_thread
+from .prompt_context import normalize_host_chat_context
 from .social_apps import (
     normalize_feed_post,
     normalize_forum_reply,
@@ -52,12 +53,14 @@ class MobileStore:
         self.active_context: ContextRef | None = None
         self.characters: list[dict[str, Any]] = []
         self.active_character: dict[str, Any] = {}
+        self.chat_context = normalize_host_chat_context(None)
 
     def bind_context(
         self,
         value: Any,
         characters: Any,
         active_character: Any,
+        chat_context: Any = None,
     ) -> dict[str, Any]:
         context = normalize_context(value)
         normalized_characters = []
@@ -75,6 +78,7 @@ class MobileStore:
         self.active_context = context
         self.characters = normalized_characters
         self.active_character = normalized_active
+        self.chat_context = normalize_host_chat_context(chat_context)
         self._ensure_card_layout(context.card_uid)
         return {
             "context": context.to_dict(),
@@ -733,6 +737,8 @@ class MobileStore:
                 "status": status,
                 "viewerCount": tick["viewerCount"],
                 "likeCount": max(current["likeCount"], tick["likeCount"]),
+                "fanCount": max(current["fanCount"], tick["fanCount"]),
+                "innerThought": tick["innerThought"] or current["innerThought"],
                 "updatedAt": now_iso(),
                 "endedAt": now_iso() if status == "ended" else "",
             }

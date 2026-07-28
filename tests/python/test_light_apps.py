@@ -132,6 +132,39 @@ def test_diary_generation_prepare_commit_is_atomic_and_notifies(
     assert not list(service.store.data_root.rglob("*.tmp"))
 
 
+def test_diary_generation_can_target_a_whitelisted_child_role(
+    service: MobileChatService,
+) -> None:
+    alice = character()
+    bob = character("card_b", "Bob")
+    service.dispatch(
+        "mobile.context.bind",
+        {
+            "context": context(),
+            "activeCharacter": alice,
+            "characters": [alice, bob],
+        },
+    )
+    prepared = service.dispatch(
+        "mobile.diary.generate.prepare",
+        {"context": context(), "roleId": "card_b"},
+    )
+    prompt = prepared["request"]["messages"][-1]["content"]
+    assert "Bob" in prompt
+    assert '"context_availability"' in prompt
+
+    committed = service.dispatch(
+        "mobile.diary.generate.commit",
+        {
+            "context": context(),
+            "operationId": prepared["operationId"],
+            "content": generated_diary(),
+        },
+    )
+    assert committed["entries"][0]["authorId"] == "card_b"
+    assert committed["entries"][0]["authorName"] == "Bob"
+
+
 def test_calendar_generation_commit_persists_event_and_notification(
     service: MobileChatService,
 ) -> None:
@@ -157,6 +190,18 @@ def test_calendar_generation_commit_persists_event_and_notification(
     assert service.dispatch("mobile.calendar.list", {"context": context()})["events"] == [
         event
     ]
+
+
+def test_calendar_generation_requests_a_short_multi_day_agenda(
+    service: MobileChatService,
+) -> None:
+    prepared = service.dispatch(
+        "mobile.calendar.generate.prepare",
+        {"context": context()},
+    )
+    prompt = prepared["request"]["messages"][-1]["content"]
+    assert "生成 4 条" in prompt
+    assert "未来 7 天" in prompt
 
 
 def test_light_app_parse_failure_can_abort_without_writing(

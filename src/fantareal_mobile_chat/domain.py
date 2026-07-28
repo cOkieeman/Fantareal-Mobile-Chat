@@ -253,6 +253,7 @@ def build_llm_request(
     content: str = "",
     mode: str = "user_message",
     system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+    prompt_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if mode not in {"user_message", "continue"}:
         raise DomainError("invalid_generation_mode", "mode 只支持 user_message 或 continue")
@@ -281,6 +282,7 @@ def build_llm_request(
             for item in recent_messages[-30:]
             if item["type"] == "text"
         ],
+        "mobile_context": prompt_context or {},
         "mode": mode,
         "userMessage": content,
     }

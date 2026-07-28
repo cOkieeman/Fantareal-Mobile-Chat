@@ -6,6 +6,7 @@ from typing import Any
 
 from .domain import ID_PATTERN, DomainError, mapping, model_payload, now_iso, sequence, text
 from .light_apps import content_source, resource_id
+from .prompt_context import mobile_prompt_context
 
 MAIL_THREAD_PREFIX = "mail"
 MAIL_MESSAGE_PREFIX = "mailmsg"
@@ -107,6 +108,9 @@ def build_mail_request(
     *,
     draft: dict[str, Any] | None = None,
     thread: dict[str, Any] | None = None,
+    characters: list[dict[str, Any]] | None = None,
+    groups: list[dict[str, Any]] | None = None,
+    chat_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if purpose not in {"mail", "mail-compose", "mail-reply"}:
         raise DomainError("invalid_generation_purpose", "不支持的邮箱生成 purpose")
@@ -125,6 +129,14 @@ def build_mail_request(
             "existing": compact_existing,
             "draft": draft or {},
             "thread": thread or {},
+            "mobile_context": mobile_prompt_context(
+                "mail",
+                active_character,
+                characters=characters,
+                groups=groups,
+                chat_context=chat_context,
+                recent_events=compact_existing,
+            ),
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -147,7 +159,7 @@ def build_mail_request(
             },
         ],
         "temperature": 0.8,
-        "maxOutputTokens": 1_600,
+        "maxOutputTokens": 3_200,
         "responseFormat": "json_object",
     }
 

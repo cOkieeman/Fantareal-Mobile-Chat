@@ -21,6 +21,13 @@
     const byId = (id) => document.getElementById(id);
     const nodes = {
       count: byId("resource-pack-count"),
+      tabs: document.querySelectorAll(".resource-tabs [data-resource-tab]"),
+      tabTriggers: document.querySelectorAll("[data-resource-tab]"),
+      stickerPanel: byId("sticker-library-panel"),
+      stickerList: byId("sticker-library-list"),
+      stickerEmpty: byId("sticker-library-empty"),
+      stickerCount: byId("sticker-library-count"),
+      managementPanel: byId("resource-management-panel"),
       list: byId("resource-pack-list"),
       empty: byId("resource-pack-empty"),
       refresh: byId("refresh-resource-packs"),
@@ -56,6 +63,7 @@
       usageBytes: 0,
       quotaBytes: 0,
       preview: null,
+      activeTab: "stickers",
       loading: false,
     };
 
@@ -170,11 +178,11 @@
 
     function renderPack(pack) {
       const item = document.createElement("li");
-      item.className = "background-job-card resource-pack-card";
+      item.className = "resource-pack-card";
       item.dataset.status = pack.status === "damaged" ? "damaged" : "ready";
 
       const heading = document.createElement("div");
-      heading.className = "background-job-heading resource-pack-heading";
+      heading.className = "resource-pack-heading";
       const copy = document.createElement("div");
       const titleRow = document.createElement("div");
       const title = document.createElement("strong");
@@ -206,7 +214,7 @@
       }
 
       const meta = document.createElement("div");
-      meta.className = "background-job-meta";
+      meta.className = "resource-pack-meta";
       const counts = kindSummary(pack.kindCounts);
       const usage = document.createElement("span");
       usage.textContent = `${pack.assetCount || 0} 项 · ${formatBytes(pack.totalSizeBytes)}`;
@@ -226,10 +234,47 @@
       return item;
     }
 
+    function stickerAssets() {
+      return state.packs.flatMap((pack) => (
+        pack.status === "ready"
+          ? (pack.previewAssets || [])
+            .filter((asset) => asset.kind === "sticker")
+            .map((asset) => ({ ...asset, packName: pack.name || pack.id }))
+          : []
+      ));
+    }
+
+    function renderSticker(asset) {
+      const card = document.createElement("article");
+      card.className = "sticker-library-card";
+      card.append(makePreview(asset));
+      const pack = document.createElement("small");
+      pack.textContent = String(asset.packName || "表情包");
+      card.append(pack);
+      return card;
+    }
+
+    function selectTab(tab) {
+      state.activeTab = tab === "manage" ? "manage" : "stickers";
+      render();
+    }
+
     function render() {
+      const stickers = stickerAssets();
+      nodes.stickerList.replaceChildren(...stickers.map(renderSticker));
+      nodes.stickerCount.textContent = `${stickers.length} 个可预览表情`;
+      nodes.stickerEmpty.hidden = stickers.length > 0 || !state.context;
+      nodes.stickerList.hidden = stickers.length === 0;
+      nodes.stickerPanel.hidden = state.activeTab !== "stickers";
+      nodes.managementPanel.hidden = state.activeTab !== "manage";
+      for (const tab of nodes.tabs) {
+        const active = tab.dataset.resourceTab === state.activeTab;
+        tab.classList.toggle("is-active", active);
+        tab.setAttribute("aria-selected", String(active));
+      }
       nodes.list.replaceChildren(...state.packs.map(renderPack));
       nodes.count.textContent = state.context
-        ? `${state.packs.length} 个资源包`
+        ? `${stickers.length} 个表情 · ${state.packs.length} 个资源包`
         : "等待角色 Context";
       nodes.empty.hidden = state.packs.length > 0 || !state.context;
       nodes.list.hidden = state.packs.length === 0;
@@ -453,6 +498,9 @@
     nodes.importFirst.addEventListener("click", () => void chooseDirectory());
     nodes.clear.addEventListener("click", () => void clearPacks());
     nodes.form.addEventListener("submit", (event) => void importPack(event));
+    for (const tab of nodes.tabTriggers) {
+      tab.addEventListener("click", () => selectTab(tab.dataset.resourceTab));
+    }
     nodes.dialog.addEventListener("close", () => {
       if (!state.loading) state.preview = null;
     });
