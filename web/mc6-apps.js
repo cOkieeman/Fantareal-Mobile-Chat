@@ -37,6 +37,7 @@
       phoneContact: byId("phone-contact-input"),
       phoneHistory: byId("phone-session-list"),
       phoneHistoryEmpty: byId("phone-history-empty"),
+      phoneAvatar: byId("phone-avatar-mark"),
       phoneName: byId("phone-active-name"),
       phoneState: byId("phone-active-state"),
       phoneLines: byId("phone-lines"),
@@ -50,17 +51,27 @@
       liveCount: byId("live-count"),
       liveStart: byId("start-live"),
       liveStop: byId("stop-live-generation"),
+      liveLobby: byId("live-lobby"),
       liveEmpty: byId("live-empty"),
       liveCurrent: byId("live-current"),
+      liveLobbyBack: byId("back-to-live-lobby"),
+      liveHostAvatar: byId("live-host-avatar"),
+      liveHostName: byId("live-host-name"),
       liveBadge: byId("live-badge"),
       liveTitle: byId("live-current-title"),
       liveMeta: byId("live-current-meta"),
+      liveDepth: byId("live-current-depth"),
       liveContinue: byId("continue-live"),
       liveLike: byId("like-live"),
       liveEnd: byId("end-live"),
       liveDelete: byId("delete-live"),
       liveSegments: byId("live-segments"),
+      liveSegmentCount: byId("live-segment-count"),
       liveMessages: byId("live-messages"),
+      liveHighlights: byId("live-highlights"),
+      liveContributors: byId("live-contributors"),
+      liveInnerThought: byId("live-inner-thought"),
+      liveStats: byId("live-stats"),
       liveMessageForm: byId("live-message-form"),
       liveMessageInput: byId("live-message-input"),
       liveHistory: byId("live-history"),
@@ -68,6 +79,7 @@
       assistantList: byId("assistant-list"),
       assistantEmpty: byId("assistant-empty"),
       assistantCreate: byId("create-assistant-draft"),
+      assistantExtract: byId("extract-assistant-draft"),
       assistantCreateFirst: byId("create-first-assistant-draft"),
       assistantStop: byId("stop-assistant-generation"),
       assistantDialog: byId("assistant-dialog"),
@@ -105,6 +117,7 @@
       loading: new Set(),
       phoneSessions: [],
       activePhoneId: null,
+      newPhoneLineIds: [],
       liveStreams: [],
       activeLiveId: null,
       drafts: [],
@@ -112,6 +125,7 @@
       profiles: [],
       diagnostics: [],
     };
+    let phoneRevealTimer = null;
     const generated = window.MobileChatGeneratedApp.createRunner({
       ...dependencies,
       getContext: () => state.context,
@@ -218,17 +232,29 @@
       }
       nodes.phoneHistoryEmpty.hidden = state.phoneSessions.length > 0;
       nodes.phoneCount.textContent = `${state.phoneSessions.length} 次通话 · 仅前台文本`;
-      nodes.phoneName.textContent = session?.contactName
+      const contactName = session?.contactName
         || nodes.phoneContact.selectedOptions[0]?.textContent
         || "选择联系人";
+      nodes.phoneName.textContent = contactName;
+      nodes.phoneAvatar.textContent = contactName === "选择联系人"
+        ? "话"
+        : contactName.slice(0, 1);
       nodes.phoneState.textContent = session
         ? `${session.status === "ongoing" ? "正在通话" : "通话已结束"} · ${session.lines.length} 句`
         : "前台文本模拟，不使用麦克风";
       nodes.phoneLines.replaceChildren();
-      for (const line of session?.lines || []) {
+      const stageLines = (session?.lines || []).slice(-12);
+      for (const line of stageLines) {
+        const revealIndex = state.newPhoneLineIds.indexOf(line.lineId);
+        const isNew = line.direction === "received" && revealIndex >= 0;
         const item = element(
           "li",
-          `phone-line ${line.direction === "sent" ? "sent" : "received"}`,
+          [
+            "phone-line",
+            line.direction === "sent" ? "sent" : "received",
+            isNew ? "is-new" : "",
+            isNew ? `reveal-${Math.min(revealIndex + 1, 3)}` : "",
+          ].filter(Boolean).join(" "),
         );
         item.append(
           element("small", "", `${line.direction === "sent" ? "我" : line.authorName} · ${formatTime(line.createdAt)}`),
@@ -238,6 +264,9 @@
       }
       nodes.phoneLinesEmpty.hidden = Boolean(session?.lines.length);
       nodes.phoneLines.hidden = !session?.lines.length;
+      window.requestAnimationFrame(() => {
+        nodes.phoneLines.lastElementChild?.scrollIntoView({ block: "end" });
+      });
       const busy = generation.isBusy();
       const ongoing = session?.status === "ongoing";
       nodes.phoneContact.disabled = !state.context || busy;
@@ -266,6 +295,7 @@
       const content = nodes.phoneInput.value.trim();
       if (!content) return;
       const session = activePhone();
+      const previousLineIds = new Set((session?.lines || []).map((line) => line.lineId));
       const matching = session?.status === "ongoing"
         && session.contactId === nodes.phoneContact.value;
       await generated.run("phone", {
@@ -276,9 +306,24 @@
           content,
         },
         onCommitted: async (_purpose, result) => {
-          state.activePhoneId = result.session.sessionId;
+          const committed = result.session;
+          state.activePhoneId = committed.sessionId;
+          state.newPhoneLineIds = committed.lines
+            .filter((line) => line.direction === "received" && !previousLineIds.has(line.lineId))
+            .map((line) => line.lineId);
+          state.phoneSessions = [
+            committed,
+            ...state.phoneSessions.filter((item) => item.sessionId !== committed.sessionId),
+          ];
           nodes.phoneInput.value = "";
+          renderPhone();
           await loadPhone();
+          if (phoneRevealTimer !== null) window.clearTimeout(phoneRevealTimer);
+          phoneRevealTimer = window.setTimeout(() => {
+            state.newPhoneLineIds = [];
+            phoneRevealTimer = null;
+            renderPhone();
+          }, 4200);
         },
         successMessage: "电话回复已保存",
         focusAfterCommit: () => nodes.phoneInput.focus({ preventScroll: true }),
@@ -327,7 +372,7 @@
           if (!state.liveStreams.some(
             (stream) => stream.streamId === state.activeLiveId,
           )) {
-            state.activeLiveId = state.liveStreams[0]?.streamId || null;
+            state.activeLiveId = null;
           }
         }
       } catch (error) {
@@ -341,33 +386,48 @@
 
     function renderLive() {
       const stream = activeLive();
-      nodes.liveCount.textContent = `${state.liveStreams.length} 场直播 · 手动继续片段`;
-      nodes.liveEmpty.hidden = Boolean(stream);
+      const liveRooms = state.liveStreams.filter((item) => item.status === "live").length;
+      nodes.liveCount.textContent = `${state.liveStreams.length} 个房间 · ${liveRooms} 个直播中`;
+      nodes.liveLobby.hidden = Boolean(stream);
+      nodes.liveEmpty.hidden = state.liveStreams.length > 0;
       nodes.liveCurrent.hidden = !stream;
       nodes.liveHistory.replaceChildren();
       for (const item of state.liveStreams) {
-        const row = element("li", "mc6-history-item");
-        const button = element("button");
+        const row = element("li");
+        const button = element("button", "live-lobby-card");
         button.type = "button";
         button.dataset.liveStreamId = item.streamId;
-        if (item.streamId === state.activeLiveId) button.setAttribute("aria-current", "true");
-        button.append(
+        const identity = element("span", "live-lobby-identity");
+        identity.append(
+          element("span", "live-lobby-avatar", (item.hostName || "播").slice(0, 1)),
+          element("span", item.status === "live" ? "is-live" : "is-ended", item.status === "live" ? "LIVE" : "回放"),
+        );
+        const copy = element("span", "live-lobby-copy");
+        copy.append(
           element("strong", "", item.title),
-          element(
-            "small",
-            "",
-            `${item.status === "live" ? "直播中" : "已结束"} · ${formatTime(item.updatedAt)}`,
-          ),
+          element("small", "", `${item.hostName} · ${item.viewerCount} 观看 · ${item.likeCount} 赞`),
+          element("p", "", item.segments.at(-1)?.content || "等待直播内容"),
+        );
+        button.append(
+          identity,
+          copy,
+          element("span", "live-lobby-enter", "进入 ›"),
         );
         row.append(button);
         nodes.liveHistory.append(row);
       }
       if (stream) {
+        nodes.liveHostAvatar.textContent = (stream.hostName || "播").slice(0, 1);
+        nodes.liveHostName.textContent = stream.hostName || "小手机直播间";
         nodes.liveBadge.textContent = stream.status === "live" ? "LIVE" : "ENDED";
         nodes.liveBadge.classList.toggle("is-ended", stream.status !== "live");
         nodes.liveTitle.textContent = stream.title;
         nodes.liveMeta.textContent = `${stream.viewerCount} 人观看 · ${stream.likeCount} 赞`;
-        nodes.liveLike.textContent = stream.userLiked ? "已赞" : "赞";
+        nodes.liveDepth.textContent = `${stream.fanCount || 0} 粉丝`;
+        nodes.liveInnerThought.textContent = stream.innerThought || "主播正在专注直播。";
+        nodes.liveStats.textContent = `${stream.viewerCount} 人观看 · ${stream.likeCount} 喜欢 · ${stream.segments.length} 段直播内容`;
+        nodes.liveLike.textContent = stream.userLiked ? "♥" : "♡";
+        nodes.liveLike.setAttribute("aria-pressed", String(Boolean(stream.userLiked)));
         nodes.liveSegments.replaceChildren();
         for (const segment of stream.segments) {
           const item = element("li");
@@ -377,7 +437,12 @@
           );
           nodes.liveSegments.append(item);
         }
+        nodes.liveSegmentCount.textContent = String(stream.segments.length);
         nodes.liveMessages.replaceChildren();
+        nodes.liveHighlights.replaceChildren();
+        nodes.liveContributors.replaceChildren();
+        const contributors = new Map();
+        const highlights = [];
         for (const message of stream.messages) {
           const item = element(
             "li",
@@ -388,12 +453,36 @@
             document.createTextNode(` ${message.content}`),
           );
           nodes.liveMessages.append(item);
+          if (message.highlight) {
+            highlights.push(message);
+          }
+          if (message.authorType !== "user") {
+            contributors.set(
+              message.authorName,
+              (contributors.get(message.authorName) || 0) + (message.highlight ? 5 : 1),
+            );
+          }
+        }
+        for (const message of highlights.slice(0, 1)) {
+          const highlight = element("li");
+          highlight.append(
+            element("strong", "", message.authorName),
+            document.createTextNode(` ${message.content}`),
+          );
+          nodes.liveHighlights.append(highlight);
+        }
+        nodes.liveHighlights.hidden = highlights.length === 0;
+        for (const [name, score] of [...contributors.entries()]
+          .sort((left, right) => right[1] - left[1])
+          .slice(0, 5)) {
+          const contributor = element("li");
+          contributor.append(element("span", "", name), element("b", "", String(score)));
+          nodes.liveContributors.append(contributor);
         }
       }
       const busy = generation.isBusy();
       const isLive = stream?.status === "live";
-      const hasOngoing = state.liveStreams.some((item) => item.status === "live");
-      nodes.liveStart.disabled = !state.context || busy || hasOngoing;
+      nodes.liveStart.disabled = !state.context || busy;
       nodes.liveContinue.disabled = !isLive || busy;
       nodes.liveLike.disabled = !stream || busy;
       nodes.liveEnd.disabled = !isLive || busy;
@@ -497,18 +586,18 @@
     function renderAssistant() {
       nodes.assistantList.replaceChildren();
       for (const draft of state.drafts) {
-        const card = element("li", "light-app-card assistant-card");
-        const main = element("div", "light-app-card-main");
+        const card = element("li", "assistant-draft-card");
+        const main = element("div", "assistant-draft-main");
         const heading = element("div");
         heading.append(
           element("strong", "", draft.name),
           element("time", "", formatTime(draft.updatedAt)),
         );
-        const meta = element("div", "light-app-card-meta");
+        const meta = element("div", "assistant-draft-meta");
         meta.append(element("span", "", draft.mode === "extract" ? "摘要提取" : "新建草稿"));
         for (const tag of draft.tags.slice(0, 3)) meta.append(element("span", "", tag));
         main.append(heading, element("p", "", draft.summary), meta);
-        const actions = element("div", "light-app-card-actions");
+        const actions = element("div", "assistant-draft-actions");
         for (const [action, label] of [["edit", "编"], ["delete", "删"]]) {
           const button = element("button", "", label);
           button.type = "button";
@@ -525,6 +614,7 @@
       nodes.assistantList.hidden = state.drafts.length === 0;
       const busy = generation.isBusy();
       nodes.assistantCreate.disabled = !state.context || busy;
+      nodes.assistantExtract.disabled = !state.context || busy;
       nodes.assistantCreateFirst.disabled = !state.context || busy;
     }
 
@@ -536,7 +626,7 @@
         : "描述希望得到的人物草稿；不会读取角色卡正文。";
     }
 
-    function openAssistant(draftId = null) {
+    function openAssistant(draftId = null, mode = "create") {
       state.editingDraftId = draftId;
       const draft = activeDraft();
       const editing = Boolean(draft);
@@ -553,7 +643,7 @@
         nodes.assistantChatStyle.value = draft.chatStyle;
         nodes.assistantTags.value = draft.tags.join("，");
       } else {
-        nodes.assistantMode.value = "create";
+        nodes.assistantMode.value = mode === "extract" ? "extract" : "create";
         nodes.assistantNotes.value = "";
         nodes.assistantSource.replaceChildren();
         for (const character of state.characters) {
@@ -630,6 +720,7 @@
     function initializeWorkbenchScopes() {
       if (nodes.workbenchScope.options.length) return;
       const labels = {
+        group_chat: "群聊",
         diary: "日记",
         calendar: "日程",
         feed: "动态",
@@ -788,8 +879,11 @@
       state.activeCharacter = activeCharacter || null;
       state.characters = Array.isArray(characters) ? characters : [];
       if (changed) {
+        if (phoneRevealTimer !== null) window.clearTimeout(phoneRevealTimer);
+        phoneRevealTimer = null;
         state.phoneSessions = [];
         state.activePhoneId = null;
+        state.newPhoneLineIds = [];
         state.liveStreams = [];
         state.activeLiveId = null;
         state.drafts = [];
@@ -838,6 +932,10 @@
     nodes.liveLike.addEventListener("click", () => void toggleLiveLike());
     nodes.liveEnd.addEventListener("click", () => void endLive());
     nodes.liveDelete.addEventListener("click", () => void deleteLive());
+    nodes.liveLobbyBack.addEventListener("click", () => {
+      state.activeLiveId = null;
+      renderLive();
+    });
     nodes.liveHistory.addEventListener("click", (event) => {
       const button = event.target.closest("[data-live-stream-id]");
       if (!button) return;
@@ -847,6 +945,9 @@
 
     nodes.assistantCreate.addEventListener("click", () => openAssistant());
     nodes.assistantCreateFirst.addEventListener("click", () => openAssistant());
+    document.querySelectorAll("[data-assistant-mode]").forEach((button) => {
+      button.addEventListener("click", () => openAssistant(null, button.dataset.assistantMode));
+    });
     nodes.assistantStop.addEventListener("click", () => void generated.stop("assistant"));
     nodes.assistantMode.addEventListener("change", updateAssistantMode);
     nodes.assistantForm.addEventListener("submit", (event) => void saveAssistant(event));
@@ -875,6 +976,7 @@
           assistant: loadAssistant,
           workbench: loadWorkbench,
         };
+        if (screenId === "live") state.activeLiveId = null;
         if (loaders[screenId]) void loaders[screenId]();
       },
     };

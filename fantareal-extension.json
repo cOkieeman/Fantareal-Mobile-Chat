@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "com.fantareal.mobile-chat",
   "name": "小手机",
-  "description": "角色社交与轻应用空间。MC9 RC 提供按角色隔离的轻应用、受管自动活动与用户资源包。",
-  "version": "0.9.0-rc.1",
+  "description": "角色社交与轻应用空间。MC9 RC 提供按角色隔离的轻应用与用户资源包。",
+  "version": "0.9.0-rc.2",
   "publisher": "cOkieeman",
   "compatibility": {
     "hostApi": ">=1.3.0 <2.0.0"
@@ -34,21 +34,21 @@
           "modes": [
             {
               "id": "compact",
-              "width": 390,
-              "height": 700,
-              "minWidth": 360,
-              "minHeight": 620,
-              "maxWidth": 440,
-              "maxHeight": 820
+              "width": 500,
+              "height": 860,
+              "minWidth": 480,
+              "minHeight": 760,
+              "maxWidth": 600,
+              "maxHeight": 980
             },
             {
               "id": "expanded",
-              "width": 760,
-              "height": 720,
-              "minWidth": 680,
-              "minHeight": 620,
-              "maxWidth": 960,
-              "maxHeight": 860
+              "width": 1024,
+              "height": 860,
+              "minWidth": 760,
+              "minHeight": 700,
+              "maxWidth": 1280,
+              "maxHeight": 1000
             }
           ]
         },
@@ -74,7 +74,7 @@
     "storage.assets",
     "files.user-selected.directory-read",
     "character.context.read",
-    "llm.generate",
-    "background.jobs"
+    "chat.context.read",
+    "llm.generate"
   ]
 }

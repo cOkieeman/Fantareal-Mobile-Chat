@@ -8,6 +8,7 @@ from .domain import ID_PATTERN, DomainError, mapping, model_payload, now_iso, se
 from .light_apps import content_source, resource_id
 
 PROMPT_SCOPES = (
+    "group_chat",
     "diary",
     "calendar",
     "feed",
@@ -200,7 +201,8 @@ def apply_custom_instruction(
 
 def prompt_preview(profile: dict[str, Any]) -> dict[str, Any]:
     scope = profile["scope"]
-    prompt_name = f"prompts/{scope}.md"
+    prompt_file = "group-chat" if scope == "group_chat" else scope
+    prompt_name = f"prompts/{prompt_file}.md"
     return {
         "scope": scope,
         "enabled": profile["enabled"],

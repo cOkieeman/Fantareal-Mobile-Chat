@@ -191,6 +191,13 @@ def test_prompt_profiles_have_stable_defaults_update_preview_and_reset(
     assert reset["enabled"] is False
     assert reset["instruction"] == ""
 
+    group_preview = service.dispatch(
+        "mobile.workbench.preview",
+        {"context": context(), "scope": "group_chat"},
+    )["preview"]
+    assert group_preview["packagePrompt"] == "prompts/group-chat.md"
+    assert group_preview["mode"] == "append"
+
 
 def test_custom_instruction_is_appended_without_changing_request_contract(
     service: MobileChatService,

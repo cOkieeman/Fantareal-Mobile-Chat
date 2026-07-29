@@ -1,6 +1,6 @@
 [project]
 name = "fantareal-mobile-chat"
-version = "0.9.0rc1"
+version = "0.9.0rc2"
 description = "Fantareal Mobile Chat Extension service"
 requires-python = ">=3.11,<3.12"
 dependencies = []

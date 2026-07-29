@@ -1,19 +1,19 @@
 # Fantareal Mobile Chat
 
-Fantareal 新 PC 的“小手机”Extension。`0.9.0-rc.1` 是完成 MC1–MC9 生命周期验证的首个预发布候选版。
+Fantareal 新 PC 的“小手机”Extension。`0.9.0-rc.2` 是完成 MC1–MC9 生命周期验证，并补齐 WebUI 主要交互语义后的预发布候选版。
 
 ## 当前范围
 
-- `fantareal-extension.json`：Host API 1.3 Web page + Python service manifest，声明通用 `background.jobs`、`storage.assets` 与用户选择目录权限。
-- `web/`：可切换 compact/expanded 的群聊、轻应用、自动活动与角色资源管理 UI；两个形态复用同一 DOM、router 与状态。
-- `src/fantareal_mobile_chat/`：不联网的 JSON-RPC 2.0 stdio service、Host 后台 execution 适配、per-card 原子 JSON 存储与严格资源包导入。
+- `fantareal-extension.json`：Host API 1.3 Web page + Python service manifest，声明模型、`storage.assets` 与用户选择目录权限。
+- `web/`：可切换 compact/expanded 的群聊、轻应用与角色资源管理 UI；两个形态复用同一 DOM、router 与状态。
+- `src/fantareal_mobile_chat/`：不联网的 JSON-RPC 2.0 stdio service、per-card 原子 JSON 存储与严格资源包导入。
 - `src/fantareal_mobile_chat/prompts/`：随 wheel 打包的群聊与各轻应用生成契约。
 - `docs/mc1b-presentation-spec.md`：窗口状态、逻辑尺寸、断点、关闭/恢复与 Host/Web 边界。
 - `schemas/`：群聊、轻应用、交互应用、Prompt profile 与资源包 JSON Schema。
 - `resources/empty-pack/`：不包含第三方素材的空资源包示例。
 - `tests/`：manifest、schema、离线 UI、Python service 与仓库内容审计。
 
-Service 不启动 FastAPI/HTTP，不读取主程序私有文件或 API Key，也不直接访问模型供应商。Web UI 通过 Host `character.context.read`、`llm.generate`、`background.jobs`、`storage.assets`、`files.user-selected.directory-read` 和 service RPC 组成闭环。后台任务默认关闭，只在 Fantareal Host 进程运行期间执行；角色 Context 变化后旧绑定会暂停。
+Service 不启动 FastAPI/HTTP，不读取主程序私有文件或 API Key，也不直接访问模型供应商。Web UI 通过 Host `character.context.read`、`llm.generate`、`storage.assets`、`files.user-selected.directory-read` 和 service RPC 组成闭环。所有模型生成只由当前窗口中的用户点击或提交操作触发；关闭窗口后不会继续生成内容。
 
 ## 本地验证
 
@@ -40,8 +40,7 @@ uv run --locked python tools/build_release.py --output-dir dist
 6. 验证非模态窗口、主页/群聊/轻应用、compact/expanded、主题、关闭与二次打开。
 7. 打开“资源”，选择包含 `resource-pack.json` 的目录，核对授权、用途、预览与 quota 后确认导入。
 8. 创建群聊并管理成员，验证用户发送、角色续聊、停止生成、失败重试和清空消息。
-9. 打开“自动活动”，验证默认关闭、启用/暂停、间隔、立即运行、取消与角色切换后重新绑定。
-10. 选择旧版小手机数据目录，先核对导入预览，再确认合并或替换。
+9. 选择旧版小手机数据目录，先核对导入预览，再确认合并或替换。
 
 ## 安装与生命周期
 

@@ -6,18 +6,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TextIO
 
-from .background_jobs import (
-    background_catalog,
-    background_execution,
-    background_spec,
-)
 from .domain import (
     ContextRef,
     DomainError,
     build_llm_request,
     mapping,
     new_id,
-    normalize_context,
     parse_llm_messages,
     system_error_message,
     text,
@@ -40,6 +34,7 @@ from .mail_apps import (
     parse_generated_mail_messages,
     parse_generated_mail_threads,
 )
+from .prompt_context import mobile_prompt_context
 from .resource_packs import ResourcePackManager
 from .social_apps import (
     build_social_app_request,
@@ -72,8 +67,6 @@ class PendingLightApp:
     context: ContextRef
     purpose: str
     payload: dict[str, Any] = field(default_factory=dict)
-    background_execution_id: str = ""
-    background_job_id: str = ""
 
 
 class MobileChatService:
@@ -90,7 +83,7 @@ class MobileChatService:
             return {
                 "ok": self.store is not None,
                 "service": "fantareal-mobile-chat",
-                "version": "0.9.0rc1",
+                "version": "0.9.0rc2",
             }
         if method == "extension.shutdown":
             self.pending.clear()
@@ -103,6 +96,7 @@ class MobileChatService:
                 params.get("context"),
                 params.get("characters", []),
                 params.get("activeCharacter"),
+                params.get("chatContext"),
             )
             self.pending.clear()
             return {**result, "groups": store.list_groups(result["context"])}
@@ -579,14 +573,6 @@ class MobileChatService:
             return {"updatedCount": store.mark_all_notifications_read(context)}
         if method == "mobile.notifications.clear":
             return {"deletedCount": store.clear_notifications(context)}
-        if method == "mobile.background.catalog":
-            return {"jobs": background_catalog()}
-        if method == "mobile.background.prepare":
-            return self.prepare_background(params)
-        if method == "mobile.background.commit":
-            return self.commit_background(params)
-        if method == "mobile.background.abort":
-            return self.abort_background(params)
         if method == "mobile.resources.list":
             ref = store.require_context(context)
             return self._resource_packs().list_packs(ref.card_uid)
@@ -690,72 +676,6 @@ class MobileChatService:
         self.pending.clear()
         return {"ok": True, "locale": self.locale}
 
-    def prepare_background(self, params: dict[str, Any]) -> dict[str, Any]:
-        context = normalize_context(params.get("context"))
-        active_character = mapping(
-            params.get("activeCharacter"),
-            field="activeCharacter",
-        )
-        execution_id, job_id, binding = background_execution(
-            params.get("backgroundExecution")
-        )
-        if normalize_context(binding) != context:
-            raise DomainError("context_stale", "后台任务绑定角色或 session 已变化")
-
-        spec = background_spec(params.get("purpose"))
-        if job_id != spec.job_id:
-            raise DomainError("invalid_params", "后台 jobId 与 purpose 不匹配")
-
-        self._store().bind_context(context.to_dict(), [active_character], active_character)
-        prepared = (
-            self.prepare_mail("mail", {"context": context.to_dict()})
-            if spec.purpose == "mail"
-            else self.prepare_light_app(spec.purpose, {"context": context.to_dict()})
-        )
-        operation = self.pending[prepared["operationId"]]
-        if not isinstance(operation, PendingLightApp):
-            raise DomainError("operation_not_found", "后台生成事务不存在")
-        operation.background_execution_id = execution_id
-        operation.background_job_id = job_id
-        return {
-            "generation": {
-                "operationId": operation.operation_id,
-                "request": prepared["request"],
-                "commitMethod": "mobile.background.commit",
-                "abortMethod": "mobile.background.abort",
-            }
-        }
-
-    def commit_background(self, params: dict[str, Any]) -> dict[str, Any]:
-        operation = self._background_operation(params)
-        result = mapping(params.get("result"), field="result")
-        commit_params = {
-            "context": operation.context.to_dict(),
-            "operationId": operation.operation_id,
-            "content": result.get("content"),
-        }
-        committed = (
-            self.commit_mail("mail", commit_params)
-            if operation.purpose == "mail"
-            else self.commit_light_app(operation.purpose, commit_params)
-        )
-        return {"purpose": operation.purpose, **committed}
-
-    def abort_background(self, params: dict[str, Any]) -> dict[str, Any]:
-        operation = self._background_operation(params)
-        error = mapping(params.get("error"), field="error")
-        code = text(error.get("code"), 80).lower()
-        reason = "cancelled" if "cancel" in code else "timeout" if "timeout" in code else "error"
-        aborted = self.abort_light_app(
-            operation.purpose,
-            {
-                "context": operation.context.to_dict(),
-                "operationId": operation.operation_id,
-                "reason": reason,
-            },
-        )
-        return {"purpose": operation.purpose, **aborted}
-
     def prepare_chat(self, params: dict[str, Any]) -> dict[str, Any]:
         store = self._store()
         context = store.require_context(params.get("context"))
@@ -772,12 +692,40 @@ class MobileChatService:
         history = store.list_messages(context.to_dict(), group_id)
         content = text(params.get("content"), 500)
         entry = user_message(group, content) if mode == "user_message" else None
-        request = build_llm_request(
-            group,
-            history,
-            store.active_character,
-            content=content,
-            mode=mode,
+        member_ids = {
+            item["roleId"]
+            for item in group["members"]
+            if item["kind"] == "character"
+        }
+        member_characters = [
+            item for item in store.characters if item["cardUid"] in member_ids
+        ]
+        request_character = next(
+            (
+                item
+                for item in member_characters
+                if item["cardUid"] == store.active_character["cardUid"]
+            ),
+            member_characters[0] if member_characters else {},
+        )
+        request = self._with_prompt_profile(
+            context,
+            "group_chat",
+            build_llm_request(
+                group,
+                history,
+                request_character,
+                content=content,
+                mode=mode,
+                prompt_context=mobile_prompt_context(
+                    "group_chat",
+                    store.active_character,
+                    characters=member_characters,
+                    groups=[group],
+                    recent_events=history[-12:],
+                    chat_context=store.chat_context,
+                ),
+            ),
         )
         operation_id = new_id("op")
         self.pending[operation_id] = PendingChat(
@@ -812,16 +760,31 @@ class MobileChatService:
             if purpose in {"diary", "calendar"}
             else build_social_app_request
         )
+        request_args: dict[str, Any] = {
+            "characters": store.characters,
+            "groups": store.list_groups(context.to_dict()),
+            "chat_context": store.chat_context,
+        }
+        generation_character = store.active_character
+        operation_payload: dict[str, Any] = {}
+        if purpose == "diary" and params.get("roleId"):
+            generation_character = self._character(
+                params.get("roleId"),
+                field="roleId",
+                label="日记角色",
+            )
+            operation_payload["roleId"] = generation_character["cardUid"]
         request = self._with_prompt_profile(
             context,
             purpose,
             build_request(
                 purpose,
-                store.active_character,
+                generation_character,
                 existing,
+                **request_args,
             ),
         )
-        operation_id = self._start_light_operation(purpose, context)
+        operation_id = self._start_light_operation(purpose, context, operation_payload)
         return {
             "operationId": operation_id,
             "request": request,
@@ -833,7 +796,16 @@ class MobileChatService:
         operation = self._light_operation(params, context, purpose)
         raw = text(params.get("content"), 65_536, required=True, field="content")
         if purpose == "diary":
-            entries = parse_generated_diary(raw, store.active_character)
+            diary_character = (
+                self._character(
+                    operation.payload["roleId"],
+                    field="roleId",
+                    label="日记角色",
+                )
+                if operation.payload.get("roleId")
+                else store.active_character
+            )
+            entries = parse_generated_diary(raw, diary_character)
             created = store.create_diary_entries(context.to_dict(), entries)
             notifications = store.create_notifications(
                 context.to_dict(),
@@ -865,7 +837,7 @@ class MobileChatService:
             )
             result = {"events": created, "notifications": notifications}
         elif purpose == "feed":
-            posts = parse_generated_feed(raw, store.active_character)
+            posts = parse_generated_feed(raw, store.active_character, store.characters)
             created = store.create_feed_posts(context.to_dict(), posts)
             notifications = store.create_notifications(
                 context.to_dict(),
@@ -881,7 +853,7 @@ class MobileChatService:
             )
             result = {"posts": created, "notifications": notifications}
         elif purpose == "forum":
-            threads = parse_generated_forum(raw, store.active_character)
+            threads = parse_generated_forum(raw, store.active_character, store.characters)
             created = store.create_forum_threads(context.to_dict(), threads)
             notifications = store.create_notifications(
                 context.to_dict(),
@@ -964,6 +936,9 @@ class MobileChatService:
                 existing,
                 draft=payload,
                 thread=thread,
+                characters=store.characters,
+                groups=store.list_groups(context.to_dict()),
+                chat_context=store.chat_context,
             ),
         )
         operation_id = self._start_light_operation(purpose, context, payload)
@@ -1077,7 +1052,14 @@ class MobileChatService:
         request = self._with_prompt_profile(
             context,
             "phone",
-            build_phone_request(contact, session, user_line),
+            build_phone_request(
+                contact,
+                session,
+                user_line,
+                characters=store.characters,
+                groups=store.list_groups(context.to_dict()),
+                chat_context=store.chat_context,
+            ),
         )
         operation_id = self._start_light_operation(
             "phone",
@@ -1147,6 +1129,9 @@ class MobileChatService:
                 store.active_character,
                 streams,
                 stream=stream,
+                characters=store.characters,
+                groups=store.list_groups(context.to_dict()),
+                chat_context=store.chat_context,
             ),
         )
         operation_id = self._start_light_operation(purpose, context, payload)
@@ -1373,30 +1358,6 @@ class MobileChatService:
             raise DomainError("operation_not_found", "轻应用生成事务不存在或已结束")
         if operation.context != context:
             raise DomainError("context_stale", "生成事务所属角色或 session 已变化")
-        return operation
-
-    def _background_operation(self, params: dict[str, Any]) -> PendingLightApp:
-        operation_id = text(
-            params.get("operationId"),
-            160,
-            required=True,
-            field="operationId",
-        )
-        operation = self.pending.get(operation_id)
-        if operation is None or not isinstance(operation, PendingLightApp):
-            raise DomainError("operation_not_found", "后台生成事务不存在或已结束")
-        execution_id = text(
-            params.get("executionId"),
-            160,
-            required=True,
-            field="executionId",
-        )
-        job_id = text(params.get("jobId"), 80, required=True, field="jobId")
-        if (
-            operation.background_execution_id != execution_id
-            or operation.background_job_id != job_id
-        ):
-            raise DomainError("context_stale", "后台 execution 已变化")
         return operation
 
     def _start_light_operation(

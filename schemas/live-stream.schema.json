@@ -4,7 +4,7 @@
   "title": "Fantareal Mobile Chat Live Stream",
   "type": "object",
   "additionalProperties": false,
-  "required": ["streamId", "hostId", "hostName", "title", "status", "segments", "messages", "viewerCount", "likeCount", "userLiked", "source", "createdAt", "updatedAt", "endedAt"],
+  "required": ["streamId", "hostId", "hostName", "title", "status", "segments", "messages", "viewerCount", "likeCount", "fanCount", "innerThought", "userLiked", "source", "createdAt", "updatedAt", "endedAt"],
   "properties": {
     "streamId": {"type": "string", "pattern": "^live_[A-Za-z0-9._-]{6,155}$"},
     "hostId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$"},
@@ -48,6 +48,8 @@
     },
     "viewerCount": {"type": "integer", "minimum": 0, "maximum": 10000000},
     "likeCount": {"type": "integer", "minimum": 0, "maximum": 10000000},
+    "fanCount": {"type": "integer", "minimum": 0, "maximum": 10000000},
+    "innerThought": {"type": "string", "maxLength": 500},
     "userLiked": {"type": "boolean"},
     "source": {"enum": ["manual", "model", "import"]},
     "createdAt": {"type": "string", "format": "date-time"},

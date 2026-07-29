@@ -6,6 +6,7 @@ from typing import Any
 
 from .domain import ID_PATTERN, DomainError, mapping, model_payload, now_iso, sequence, text
 from .light_apps import content_source, resource_id
+from .prompt_context import mobile_prompt_context
 
 PHONE_STATES = {"ongoing", "ended", "missed"}
 PHONE_DIRECTIONS = {"sent", "received"}
@@ -95,12 +96,24 @@ def build_phone_request(
     contact: dict[str, Any],
     session: dict[str, Any] | None,
     user_line: str,
+    *,
+    characters: list[dict[str, Any]] | None = None,
+    groups: list[dict[str, Any]] | None = None,
+    chat_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     context = json.dumps(
         {
             "contact": contact,
             "recentLines": (session or {}).get("lines", [])[-20:],
             "userLine": user_line,
+            "mobile_context": mobile_prompt_context(
+                "phone",
+                contact,
+                characters=characters,
+                groups=groups,
+                chat_context=chat_context,
+                recent_events=(session or {}).get("lines", [])[-12:],
+            ),
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -250,6 +263,8 @@ def normalize_live_stream(
         "messages": messages,
         "viewerCount": _metric(source.get("viewerCount"), "viewerCount"),
         "likeCount": _metric(source.get("likeCount"), "likeCount"),
+        "fanCount": _metric(source.get("fanCount"), "fanCount"),
+        "innerThought": text(source.get("innerThought"), 500),
         "userLiked": bool(source.get("userLiked", False)),
         "source": content_source(source.get("source")),
         "createdAt": text(source.get("createdAt"), 80) or now_iso(),
@@ -264,6 +279,9 @@ def build_live_request(
     existing: list[dict[str, Any]],
     *,
     stream: dict[str, Any] | None = None,
+    characters: list[dict[str, Any]] | None = None,
+    groups: list[dict[str, Any]] | None = None,
+    chat_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if purpose not in {"live", "live-tick"}:
         raise DomainError("invalid_generation_purpose", "不支持的直播生成 purpose")
@@ -280,6 +298,14 @@ def build_live_request(
             "activeCharacter": active_character,
             "existing": compact_existing,
             "stream": stream or {},
+            "mobile_context": mobile_prompt_context(
+                "live",
+                active_character,
+                characters=characters,
+                groups=groups,
+                chat_context=chat_context,
+                recent_events=compact_existing,
+            ),
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -328,6 +354,8 @@ def parse_live_stream(
             "messages": messages,
             "viewerCount": payload.get("viewerCount", 0),
             "likeCount": payload.get("likeCount", 0),
+            "fanCount": payload.get("fanCount", 0),
+            "innerThought": payload.get("innerThought", ""),
             "userLiked": False,
             "source": "model",
         }
@@ -355,6 +383,8 @@ def parse_live_tick(
         "status": status,
         "viewerCount": _metric(payload.get("viewerCount"), "viewerCount"),
         "likeCount": _metric(payload.get("likeCount"), "likeCount"),
+        "fanCount": _metric(payload.get("fanCount"), "fanCount"),
+        "innerThought": text(payload.get("innerThought"), 500),
     }
 
 

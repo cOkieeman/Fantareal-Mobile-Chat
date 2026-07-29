@@ -115,13 +115,13 @@
       chat_context_changed: "当前角色或主会话已变化，正在重新载入。",
       permission_denied: "小手机缺少所需权限，请重新安装并确认授权。",
       service_permission_denied: "小手机数据服务缺少所需权限。",
-      background_jobs_unavailable: "当前 Fantareal Host 不支持受管后台任务。",
-      background_job_not_found: "后台任务不存在，请重新启用。",
-      background_queue_full: "Host 后台队列已满，请稍后重试。",
-      background_paused: "后台任务已暂停。",
-      background_cancelled: "后台任务已取消。",
     };
-    return known[code] || String(error?.message || error || "操作失败");
+    const message = known[code] || String(error?.message || error || "操作失败");
+    const detail = String(error?.message || "").trim();
+    if (code === "llm_response_invalid" && detail && !message.includes(detail)) {
+      return `${message}（${detail}）`;
+    }
+    return message;
   }
 
   function isContextFailure(error) {
@@ -410,8 +410,8 @@
       live: "模拟直播",
       assistant: "人物辅助",
       workbench: "Prompt 调试台",
-      background: "自动活动",
       resources: "角色资源",
+      settings: "设置",
       home: "应用桌面",
     }[screenId] || "小手机";
   }
@@ -421,6 +421,12 @@
     elements.identitySubtitle.textContent = state.ready
       ? `${activeName || "当前角色"} · ${screenLabel(state.screen)}`
       : "正在连接当前角色…";
+    const settingsCharacter = byId("settings-character-name");
+    if (settingsCharacter) {
+      settingsCharacter.textContent = state.ready
+        ? activeName || "当前角色"
+        : "正在连接当前角色";
+    }
   }
 
   function render() {
@@ -504,6 +510,7 @@
       !host
       || typeof host.getContext !== "function"
       || typeof host.getCharacterContext !== "function"
+      || typeof host.getChatContext !== "function"
     ) {
       state.ready = false;
       setNotice("无法连接 Fantareal Host；请从主程序的应用入口打开小手机。", "error");
@@ -514,9 +521,13 @@
     state.syncing = true;
     if (!quiet) setNotice("正在连接当前角色与数据服务…");
     try {
-      const [hostContext, rawCharacterContext] = await Promise.all([
+      const [hostContext, rawCharacterContext, rawChatContext] = await Promise.all([
         host.getContext(),
         host.getCharacterContext(),
+        host.getChatContext({
+          include: ["recentMessages"],
+          messageLimit: 12,
+        }),
       ]);
       const resolved = normalizedCharacterContext(hostContext, rawCharacterContext);
       const contextChanged = !sameContext(state.context, resolved.context);
@@ -524,6 +535,7 @@
         context: resolved.context,
         characters: resolved.characters,
         activeCharacter: resolved.activeCharacter,
+        chatContext: rawChatContext,
       });
       state.hostContext = hostContext;
       state.characterContext = resolved;
@@ -989,6 +1001,7 @@
     errorCode,
     isContextFailure,
     syncContext,
+    openScreen: showScreen,
     confirmAction: askForConfirmation,
     generation: generationCoordinator,
     host,
@@ -998,7 +1011,6 @@
     window.MobileChatSocialApps?.createController(controllerDependencies),
     window.MobileChatMailApps?.createController(controllerDependencies),
     window.MobileChatMc6Apps?.createController(controllerDependencies),
-    window.MobileChatBackgroundJobs?.createController(controllerDependencies),
     window.MobileChatResourcePacks?.createController(controllerDependencies),
   ].filter(Boolean);
   showScreen(state.screen, false);

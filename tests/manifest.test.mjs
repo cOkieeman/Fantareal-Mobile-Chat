@@ -27,8 +27,8 @@ test("manifest matches the Host API 1.3 application-window contract", async () =
     "storage.assets",
     "files.user-selected.directory-read",
     "character.context.read",
+    "chat.context.read",
     "llm.generate",
-    "background.jobs",
   ]);
 
   const page = manifest.contributes.pages.at(0);
@@ -48,23 +48,24 @@ test("manifest matches the Host API 1.3 application-window contract", async () =
       maxHeight,
     })),
     [
-      { id: "compact", width: 390, height: 700, minWidth: 360, minHeight: 620, maxWidth: 440, maxHeight: 820 },
-      { id: "expanded", width: 760, height: 720, minWidth: 680, minHeight: 620, maxWidth: 960, maxHeight: 860 },
+      { id: "compact", width: 500, height: 860, minWidth: 480, minHeight: 760, maxWidth: 600, maxHeight: 980 },
+      { id: "expanded", width: 1024, height: 860, minWidth: 760, minHeight: 700, maxWidth: 1280, maxHeight: 1000 },
     ],
   );
   assert.deepEqual(command.handler, { type: "page.open", page: page.id });
   await access(path.join(root, manifest.entrypoints.page.path));
   await access(path.join(root, manifest.entrypoints.service.lockfile));
 });
-test("manifest requests the generic capabilities needed through MC8", async () => {
+test("manifest requests only foreground generation and storage capabilities through MC9", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const serialized = JSON.stringify(manifest);
 
-  assert.match(serialized, /background\.jobs/);
+  assert.doesNotMatch(serialized, /background\.jobs/);
   assert.match(serialized, /storage\.data/);
   assert.match(serialized, /storage\.assets/);
   assert.match(serialized, /files\.user-selected\.directory-read/);
   assert.match(serialized, /character\.context\.read/);
+  assert.match(serialized, /chat\.context\.read/);
   assert.match(serialized, /llm\.generate/);
   assert.doesNotMatch(serialized, /FastAPI|mobile-chat-window/i);
 });

@@ -107,6 +107,7 @@ def test_receive_mail_generation_is_atomic_and_notifies(
         {"context": context()},
     )
     assert prepared["request"]["purpose"] == "mobile-chat.mail"
+    assert prepared["request"]["maxOutputTokens"] == 3_200
     committed = service.dispatch(
         "mobile.mail.generate.commit",
         {

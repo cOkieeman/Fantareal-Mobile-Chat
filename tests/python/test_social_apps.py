@@ -7,6 +7,7 @@ from conftest import character, context
 
 from fantareal_mobile_chat.domain import DomainError
 from fantareal_mobile_chat.service import MobileChatService
+from fantareal_mobile_chat.social_apps import normalize_feed_post
 
 
 def feed_payload(**overrides: Any) -> dict[str, Any]:
@@ -44,13 +45,28 @@ def reply_payload(**overrides: Any) -> dict[str, Any]:
 
 
 def generated_feed() -> str:
-    return '{"posts":[{"content":"雨声变小了，适合把窗开一条缝。","tags":["雨夜"]}]}'
+    return (
+        '{"events":[{"title":"雨声渐停","content":"雨声变小了，适合把窗开一条缝。",'
+        '"author_name":"Alice","event_type":"moment","tags":["雨夜"],'
+        '"metadata":{"mood":"安静","media_hint":"沾着雨滴的窗玻璃",'
+        '"views":37,"comment_count":2}}]}'
+    )
 
 
 def generated_forum() -> str:
     return (
         '{"threads":[{"title":"雨停之后去哪里？",'
         '"body":"想在天亮前出去走一小段路。","category":"闲聊"}]}'
+    )
+
+
+def generated_forum_with_replies() -> str:
+    return (
+        '{"threads":[{"title":"雨停之后去哪里？",'
+        '"body":"想在天亮前出去走一小段路。","category":"闲聊",'
+        '"author_name":"Bob","replies":['
+        '{"author_name":"Alice","content":"沿河走一段吧。"},'
+        '{"author_name":"夜班店员","content":"旧书店还亮着灯。"}]}]}'
     )
 
 
@@ -104,6 +120,20 @@ def test_feed_crud_like_and_notification_lifecycle(
         == []
     )
     assert not list(service.store.data_root.rglob("*.tmp"))
+
+
+def test_feed_legacy_post_is_upgraded_without_a_destructive_migration() -> None:
+    post = normalize_feed_post(feed_payload())
+
+    assert post["title"] == "雨停了，窗外的路灯还亮着。"
+    assert post["eventType"] == "status"
+    assert post["metadata"] == {
+        "mood": "",
+        "location": "",
+        "mediaHint": "",
+        "views": 0,
+        "commentCount": 0,
+    }
 
 
 def test_forum_thread_reply_crud_and_notification_lifecycle(
@@ -197,6 +227,110 @@ def test_social_generation_prepare_commit_is_atomic_and_notifies(
     assert committed["notifications"][0]["sourceId"] == item[id_key]
     assert prepared["operationId"] not in service.pending
     assert not list(service.store.data_root.rglob("*.tmp"))
+
+
+def test_feed_generation_uses_available_world_context_and_whitelisted_author(
+    service: MobileChatService,
+) -> None:
+    alice = character()
+    bob = character("card_b", "Bob")
+    service.dispatch(
+        "mobile.context.bind",
+        {
+            "context": context(),
+            "activeCharacter": alice,
+            "characters": [alice, bob],
+        },
+    )
+    service.dispatch(
+        "mobile.groups.create",
+        {
+            "context": context(),
+            "group": {
+                "title": "雨夜闲聊",
+                "description": "大家聊聊窗外的雨。",
+                "members": [
+                    {"roleId": "card_a", "displayName": "Alice", "kind": "character"},
+                    {"roleId": "card_b", "displayName": "Bob", "kind": "character"},
+                ],
+            },
+        },
+    )
+
+    prepared = service.dispatch(
+        "mobile.feed.generate.prepare",
+        {"context": context()},
+    )
+    user_prompt = prepared["request"]["messages"][-1]["content"]
+    system_prompt = prepared["request"]["messages"][0]["content"]
+    for marker in [
+        '"current_date"',
+        '"current_datetime"',
+        '"role_app_policy"',
+        '"roles"',
+        '"groups"',
+        '"recent_channel_events"',
+        '"context_availability"',
+        "Alice",
+        "Bob",
+        "雨夜闲聊",
+    ]:
+        assert marker in user_prompt
+    assert '"events"' in system_prompt
+    assert "author_name" in system_prompt
+    assert "event_type" in system_prompt
+    assert "metadata" in system_prompt
+
+    committed = service.dispatch(
+        "mobile.feed.generate.commit",
+        {
+            "context": context(),
+            "operationId": prepared["operationId"],
+            "content": (
+                '{"events":[{"title":"换个地方读书","content":"咖啡还热着。",'
+                '"author_name":"Bob","event_type":"status","tags":["咖啡"],'
+                '"metadata":{"author_id":"card_b","mood":"放松","views":19}}]}'
+            ),
+        },
+    )
+    post = committed["posts"][0]
+    assert post["authorId"] == "card_b"
+    assert post["authorName"] == "Bob"
+    assert post["title"] == "换个地方读书"
+    assert post["eventType"] == "status"
+    assert post["metadata"]["mood"] == "放松"
+    assert post["metadata"]["views"] == 19
+
+
+def test_forum_generation_keeps_whitelisted_author_and_two_thread_local_replies(
+    service: MobileChatService,
+) -> None:
+    alice = character()
+    bob = character("card_b", "Bob")
+    service.dispatch(
+        "mobile.context.bind",
+        {
+            "context": context(),
+            "activeCharacter": alice,
+            "characters": [alice, bob],
+        },
+    )
+    prepared = service.dispatch("mobile.forum.generate.prepare", {"context": context()})
+    committed = service.dispatch(
+        "mobile.forum.generate.commit",
+        {
+            "context": context(),
+            "operationId": prepared["operationId"],
+            "content": generated_forum_with_replies(),
+        },
+    )
+    thread = committed["threads"][0]
+    assert thread["authorId"] == "card_b"
+    assert thread["authorName"] == "Bob"
+    assert len(thread["replies"]) == 2
+    assert thread["replies"][0]["authorId"] == "card_a"
+    assert thread["replies"][1]["authorId"].startswith("forum_guest_")
+    assert thread["replies"][1]["authorName"] == "夜班店员"
 
 
 def test_social_parse_failure_can_abort_and_cannot_cross_purpose(
