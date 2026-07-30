@@ -452,7 +452,7 @@ test("MC9.2 keeps the twelve-app phone desktop and dedicated light-app experienc
   assert.match(lightApps, /dataset\.action === "open-source"/);
   assert.match(resources, /function stickerAssets\(/);
   assert.match(resources, /asset\.kind === "sticker"/);
-  assert.match(resources, /state\.activeTab = tab === "manage" \? "manage" : "stickers"/);
+  assert.match(resources, /\["stickers", "backgrounds", "manage"\]\.includes\(tab\)/);
   assert.match(styles, /\.forum-list-view\[hidden\],\s*\n\.forum-detail-view\[hidden\]/);
   assert.match(
     styles,
@@ -516,6 +516,51 @@ test("MC9.2 keeps mail, diary, notifications, phone, assistant and settings visu
   ]) {
     assert.ok(styles.includes(signature), `missing app-specific palette signature: ${signature}`);
   }
+});
+
+test("common dialogs keep a compositing-safe Qt WebEngine backdrop", async () => {
+  const styles = await readFile(path.join(root, "web/styles.css"), "utf8");
+  const backdrop = styles.match(
+    /\.mobile-dialog::backdrop\s*\{([\s\S]*?)\}/,
+  )?.[1] ?? "";
+
+  assert.match(backdrop, /background:\s*rgba\(3,\s*8,\s*14,\s*0\.7\)/);
+  assert.doesNotMatch(
+    backdrop,
+    /backdrop-filter\s*:/,
+    "a full-window backdrop blur forces expensive repainting in Qt WebEngine",
+  );
+});
+
+test("presentation and common chrome avoid repeated layout, long state motion, and live blur", async () => {
+  const styles = await readFile(path.join(root, "web/styles.css"), "utf8");
+  const deviceRule = styles.match(/\.device\s*\{([\s\S]*?)\}/)?.[1] ?? "";
+
+  assert.doesNotMatch(
+    deviceRule,
+    /transition\s*:[\s\S]*?\bwidth\b/,
+    "Qt already resizes the native window before Web presentation changes",
+  );
+  assert.doesNotMatch(
+    deviceRule,
+    /transition\s*:[\s\S]*?\bborder-radius\b/,
+    "presentation radius changes must not schedule style work for every animation frame",
+  );
+  assert.doesNotMatch(
+    styles,
+    /@keyframes\s+screen-enter\b/,
+    "screen changes should complete in one render pass inside Qt WebEngine",
+  );
+  assert.match(
+    styles,
+    /\.app-navigation button\s*\{\s*transition:\s*transform var\(--motion-duration\) ease;\s*\}/,
+    "navigation state colors must update immediately while hover movement stays animated",
+  );
+  assert.doesNotMatch(
+    styles,
+    /backdrop-filter\s*:/,
+    "live backdrop blur repaints the full WebEngine surface when dialogs open",
+  );
 });
 
 test("MC9.2 keeps live and calendar at readable 100% presentation scale", async () => {
@@ -623,6 +668,77 @@ test("MC9.5 restores diary detail, calendar reminders, phone reveal and live lob
     await readFile(path.join(root, "web/app.js"), "utf8"),
     /code === "llm_response_invalid"[\s\S]*?detail/,
   );
+});
+
+test("MC10 consumes visual presets, backgrounds and stickers without a second shell", async () => {
+  const html = await readFile(path.join(root, "web/index.html"), "utf8");
+  const app = await readFile(path.join(root, "web/app.js"), "utf8");
+  const resources = await readFile(path.join(root, "web/resource-packs.js"), "utf8");
+  const styles = await readFile(path.join(root, "web/styles.css"), "utf8");
+  const appearance = await readFile(path.join(root, "web/appearance.css"), "utf8");
+
+  for (const marker of [
+    'data-appearance-preset="modern"',
+    'data-appearance-preset="social"',
+    'data-appearance-preset="xianxia"',
+    'data-appearance-preset="apocalypse"',
+    'data-resource-tab="backgrounds"',
+    'id="background-library-panel"',
+    'id="open-sticker-picker"',
+    'id="sticker-picker-dialog"',
+    'id="sticker-picker-list"',
+    'id="load-more-stickers"',
+    'id="load-more-backgrounds"',
+    'id="load-more-picker-stickers"',
+    'id="export-mobile-data"',
+    'id="restore-mobile-data"',
+    'id="reset-mobile-data"',
+  ]) {
+    assert.ok(html.includes(marker), `missing MC10 visual/resource marker: ${marker}`);
+  }
+  assert.match(app, /mobile\.messages\.sticker\.create/);
+  assert.match(app, /mobile\.data\.export/);
+  assert.match(app, /mobile\.data\.restore\.preview/);
+  assert.match(app, /mobile\.data\.restore\.apply/);
+  assert.match(app, /mobile\.data\.reset/);
+  assert.match(app, /host\.saveFile/);
+  assert.match(app, /suggestedName:\s*"mobile-chat-backup\.json"/);
+  assert.match(app, /mediaType:\s*"application\/json"/);
+  assert.match(html, /id="export-mobile-data" type="button"/);
+  assert.doesNotMatch(html, /id="export-mobile-data"[^>]*disabled/);
+  assert.match(html, /导出备份[\s\S]*完整小手机数据/);
+  assert.match(html, /重置小手机数据[\s\S]*保留已导入资源包/);
+  assert.match(app, /message\.type === "sticker"/);
+  assert.match(resources, /mobile\.appearance\.get/);
+  assert.match(resources, /mobile\.appearance\.update/);
+  assert.match(resources, /mobile\.resources\.assets\.list/);
+  assert.match(resources, /mobile\.resources\.asset\.get/);
+  assert.match(resources, /offset:\s*current\.length/);
+  assert.match(resources, /ASSET_PAGE_SIZE\s*=\s*48/);
+  for (const preset of ["modern", "social", "xianxia", "apocalypse"]) {
+    assert.match(appearance, new RegExp(`data-preset="${preset}"`));
+  }
+  assert.match(html, /<link rel="stylesheet" href="styles\.css" \/>[\s\S]*?<link rel="stylesheet" href="appearance\.css" \/>/);
+  assert.doesNotMatch(`${app}\n${resources}`, /WORLD_THEME_PROMPTS/);
+  assert.equal((html.match(/id="device-shell"/g) || []).length, 1);
+});
+
+test("MC10 presets restore the old WebUI component identities", async () => {
+  const appearance = await readFile(path.join(root, "web/appearance.css"), "utf8");
+
+  for (const preset of ["modern", "social", "xianxia", "apocalypse"]) {
+    assert.match(
+      appearance,
+      new RegExp(`html\\[data-preset="${preset}"\\] \\.device`),
+      `${preset} must theme the device surface, not only accent tokens`,
+    );
+  }
+  assert.match(appearance, /html\[data-preset="social"\] \.message\.outgoing p[\s\S]*?#62c777/);
+  assert.match(appearance, /html\[data-preset="social"\] \.composer[\s\S]*?#24262a/);
+  assert.match(appearance, /html\[data-preset="xianxia"\] \.home-hero[\s\S]*?255,\s*236,\s*195/);
+  assert.match(appearance, /html\[data-preset="xianxia"\] \.app-icon-chat[\s\S]*?#c99a56/);
+  assert.match(appearance, /html\[data-preset="apocalypse"\] \.home-hero[\s\S]*?215,\s*102,\s*82/);
+  assert.match(appearance, /html\[data-preset="apocalypse"\] \.app-icon-chat[\s\S]*?#d76652/);
 });
 
 test("offline package policy and frozen presentation contract remain intact", async () => {

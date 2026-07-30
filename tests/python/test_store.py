@@ -220,3 +220,93 @@ def test_explicit_legacy_import_preview_and_apply(
     assert not existing_messages_path.exists()
     groups = service.dispatch("mobile.groups.list", {"context": context()})["groups"]
     assert [item["groupId"] for item in groups] == [group_id]
+
+
+def test_per_card_backup_restore_and_reset_round_trip(
+    service: MobileChatService,
+    tmp_path: Path,
+    group_payload: dict[str, Any],
+) -> None:
+    group = service.dispatch(
+        "mobile.groups.create",
+        {"context": context(), "group": group_payload},
+    )["group"]
+    service.store.append_messages(
+        context(),
+        group["groupId"],
+        [
+            {
+                "speakerId": "user",
+                "speakerName": "Me",
+                "type": "text",
+                "content": "Keep in backup",
+                "source": "user",
+            }
+        ],
+    )
+    service.dispatch(
+        "mobile.appearance.update",
+        {
+            "context": context(),
+            "appearance": {"preset": "social", "tone": "mist"},
+        },
+    )
+    exported = service.dispatch("mobile.data.export", {"context": context()})
+    backup = exported["backup"]
+    assert backup["kind"] == "fantareal.mobile-chat.backup"
+    assert backup["sourceCardUid"] == "card_a"
+    assert backup["data"]["appearance"]["preset"] == "social"
+    assert backup["excludes"] == ["resourceAssetBytes", "apiKeys", "hostPrivateData"]
+
+    selected = tmp_path / "mobile-chat-backup"
+    selected.mkdir()
+    (selected / "mobile-chat-backup.json").write_text(
+        json.dumps(backup),
+        encoding="utf-8",
+    )
+    token = str(UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"))
+    grants = service.store.workspace_root / "input-directory-grants"
+    grants.mkdir(exist_ok=True)
+    (grants / f"{token}.json").write_text(
+        json.dumps(
+            {
+                "kind": "fantareal.directory-grant",
+                "schemaVersion": 1,
+                "token": token,
+                "path": str(selected),
+                "name": selected.name,
+                "readOnly": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    preview = service.dispatch(
+        "mobile.data.restore.preview",
+        {"context": context(), "directoryToken": token},
+    )
+    assert preview["groupCount"] == 1
+    assert preview["messageCount"] == 1
+
+    reset = service.dispatch("mobile.data.reset", {"context": context()})
+    assert reset["retained"] == ["resourcePacks"]
+    assert service.dispatch("mobile.groups.list", {"context": context()})["groups"] == []
+    assert service.dispatch(
+        "mobile.appearance.get",
+        {"context": context()},
+    )["appearance"]["preset"] == "modern"
+
+    restored = service.dispatch(
+        "mobile.data.restore.apply",
+        {
+            "context": context(),
+            "directoryToken": token,
+            "contentDigest": preview["contentDigest"],
+        },
+    )
+    assert restored["groupCount"] == 1
+    assert restored["messageCount"] == 1
+    messages = service.dispatch(
+        "mobile.messages.list",
+        {"context": context(), "groupId": group["groupId"]},
+    )["messages"]
+    assert [item["content"] for item in messages] == ["Keep in backup"]

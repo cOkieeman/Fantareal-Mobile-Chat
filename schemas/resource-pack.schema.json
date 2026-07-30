@@ -49,7 +49,16 @@
           "maxLength": 120,
           "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
         },
-        "kind": { "enum": ["sticker", "background", "avatar-decoration"] },
+        "kind": {
+          "oneOf": [
+            { "enum": ["sticker", "background"] },
+            {
+              "const": "avatar-decoration",
+              "deprecated": true,
+              "description": "Compatibility-only import value. Mobile Chat no longer exposes a consumer UI for avatar decorations."
+            }
+          ]
+        },
         "path": {
           "type": "string",
           "minLength": 1,

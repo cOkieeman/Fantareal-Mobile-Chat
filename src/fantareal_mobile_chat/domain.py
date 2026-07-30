@@ -9,6 +9,8 @@ from typing import Any
 from uuid import uuid4
 
 ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$")
+APPEARANCE_PRESETS = {"modern", "social", "xianxia", "apocalypse"}
+APPEARANCE_TONES = {"midnight", "mist"}
 GROUP_ID_PATTERN = re.compile(r"^group_[a-z0-9][a-z0-9_-]{5,79}$")
 FENCE_PATTERN = re.compile(r"```(?:json)?\s*([\s\S]*?)```", re.IGNORECASE)
 THINK_PATTERN = re.compile(r"<think>[\s\S]*?</think>", re.IGNORECASE)
@@ -178,11 +180,42 @@ def normalize_group(value: Any, *, existing: dict[str, Any] | None = None) -> di
     }
 
 
-def normalize_message(value: Any) -> dict[str, str]:
+def normalize_resource_ref(value: Any, *, kind: str = "resource") -> dict[str, str]:
+    source = mapping(value, field=kind)
+    pack_id = text(source.get("packId"), 120)
+    asset_id = text(source.get("assetId"), 120)
+    alt = text(source.get("alt"), 120) or "未命名"
+    if not ID_PATTERN.fullmatch(pack_id) or not ID_PATTERN.fullmatch(asset_id):
+        raise DomainError("invalid_resource_ref", f"{kind} 引用无效")
+    return {"packId": pack_id, "assetId": asset_id, "alt": alt}
+
+
+def normalize_appearance(value: Any) -> dict[str, Any]:
+    source = value if isinstance(value, dict) else {}
+    preset = text(source.get("preset"), 24).lower()
+    tone = text(source.get("tone"), 24).lower()
+    background = source.get("background")
+    try:
+        normalized_background = (
+            normalize_resource_ref(background, kind="appearance.background")
+            if background is not None
+            else None
+        )
+    except DomainError:
+        normalized_background = None
+    return {
+        "schemaVersion": 1,
+        "preset": preset if preset in APPEARANCE_PRESETS else "modern",
+        "tone": tone if tone in APPEARANCE_TONES else "midnight",
+        "background": normalized_background,
+    }
+
+
+def normalize_message(value: Any) -> dict[str, Any]:
     source = mapping(value, field="message")
     message_type = text(source.get("type"), 20).lower() or "text"
-    if message_type not in {"text", "error"}:
-        raise DomainError("invalid_message", "message.type 只支持 text 或 error")
+    if message_type not in {"text", "error", "sticker"}:
+        raise DomainError("invalid_message", "message.type 只支持 text、error 或 sticker")
     source_kind = text(source.get("source"), 20).lower() or "system"
     if source_kind not in {"user", "ai", "system", "import"}:
         raise DomainError("invalid_message", "message.source 无效")
@@ -197,7 +230,7 @@ def normalize_message(value: Any) -> dict[str, str]:
     message_id = text(source.get("messageId") or source.get("message_id"), 160)
     if message_id and not ID_PATTERN.fullmatch(message_id):
         message_id = ""
-    return {
+    result: dict[str, Any] = {
         "messageId": message_id or new_id("msg"),
         "speakerId": speaker_id,
         "speakerName": text(
@@ -206,13 +239,24 @@ def normalize_message(value: Any) -> dict[str, str]:
         )
         or "系统",
         "type": message_type,
-        "content": text(source.get("content"), 16_384, required=True, field="message.content"),
         "createdAt": text(source.get("createdAt") or source.get("created_at"), 80) or now_iso(),
         "source": source_kind,
     }
+    if message_type == "sticker":
+        sticker = normalize_resource_ref(source.get("sticker"), kind="message.sticker")
+        result["sticker"] = sticker
+        result["content"] = f"[表情：{sticker['alt']}]"
+    else:
+        result["content"] = text(
+            source.get("content"),
+            16_384,
+            required=True,
+            field="message.content",
+        )
+    return result
 
 
-def user_message(group: dict[str, Any], content: str) -> dict[str, str]:
+def user_message(group: dict[str, Any], content: str) -> dict[str, Any]:
     user = next((item for item in group["members"] if item["kind"] == "user"), None)
     return normalize_message(
         {
@@ -225,7 +269,20 @@ def user_message(group: dict[str, Any], content: str) -> dict[str, str]:
     )
 
 
-def system_error_message(content: str) -> dict[str, str]:
+def user_sticker_message(group: dict[str, Any], sticker: Any) -> dict[str, Any]:
+    user = next((item for item in group["members"] if item["kind"] == "user"), None)
+    return normalize_message(
+        {
+            "speakerId": user["roleId"] if user else "user",
+            "speakerName": user["displayName"] if user else "我",
+            "type": "sticker",
+            "sticker": sticker,
+            "source": "user",
+        }
+    )
+
+
+def system_error_message(content: str) -> dict[str, Any]:
     return normalize_message(
         {
             "speakerId": "system",
@@ -247,7 +304,7 @@ DEFAULT_SYSTEM_PROMPT = (
 
 def build_llm_request(
     group: dict[str, Any],
-    recent_messages: list[dict[str, str]],
+    recent_messages: list[dict[str, Any]],
     active_character: dict[str, Any],
     *,
     content: str = "",
@@ -280,7 +337,7 @@ def build_llm_request(
                 "content": item["content"],
             }
             for item in recent_messages[-30:]
-            if item["type"] == "text"
+            if item["type"] in {"text", "sticker"}
         ],
         "mobile_context": prompt_context or {},
         "mode": mode,

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="midnight" data-presentation="compact" data-chat-view="groups">
+<html lang="zh-CN" data-theme="midnight" data-preset="modern" data-presentation="compact" data-chat-view="groups">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -12,6 +12,7 @@
     <title>小手机 · 角色轻应用</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="appearance.css" />
   </head>
   <body>
     <main class="stage" aria-label="Fantareal 小手机">
@@ -38,7 +39,7 @@
         <p class="phase-note">MC9 RC · LIFECYCLE VERIFIED</p>
       </aside>
 
-      <section class="device" aria-label="小手机界面">
+      <section id="device-shell" class="device" aria-label="小手机界面">
         <header class="status-bar" aria-label="手机状态">
           <time id="clock">09:41</time>
           <div class="phone-status" aria-hidden="true">
@@ -188,6 +189,28 @@
                 </div>
               </section>
               <div class="settings-scroll">
+                <section class="settings-group appearance-settings" aria-labelledby="settings-appearance-title">
+                  <h3 id="settings-appearance-title">外观</h3>
+                  <div class="appearance-preset-grid" role="group" aria-label="视觉风格">
+                    <button class="is-active" type="button" data-appearance-preset="modern" aria-pressed="true">
+                      <strong>现代</strong><small>清透蓝色玻璃</small>
+                    </button>
+                    <button type="button" data-appearance-preset="social" aria-pressed="false">
+                      <strong>社交</strong><small>深色社交与微信绿</small>
+                    </button>
+                    <button type="button" data-appearance-preset="xianxia" aria-pressed="false">
+                      <strong>仙侠</strong><small>宣纸、暖棕与玉色</small>
+                    </button>
+                    <button type="button" data-appearance-preset="apocalypse" aria-pressed="false">
+                      <strong>末世</strong><small>军绿与工业终端</small>
+                    </button>
+                  </div>
+                  <div class="appearance-background-row">
+                    <span><strong>当前背景</strong><small id="appearance-background-name">默认背景</small></span>
+                    <button id="clear-appearance-background" type="button" disabled>清除</button>
+                  </div>
+                  <p class="appearance-boundary">视觉风格只改变界面材质和颜色，不修改 Prompt、角色设定或模型请求。</p>
+                </section>
                 <section class="settings-group" aria-labelledby="settings-generation-title">
                   <h3 id="settings-generation-title">生成与行为</h3>
                   <nav class="settings-list" aria-label="生成与行为设置">
@@ -204,6 +227,26 @@
                     <button type="button" data-open-screen="resources">
                       <span aria-hidden="true">资</span>
                       <span><strong>表情与资源</strong><small>浏览表情并管理本地资源包</small></span>
+                      <b aria-hidden="true">›</b>
+                    </button>
+                  </nav>
+                </section>
+                <section class="settings-group" aria-labelledby="settings-data-title">
+                  <h3 id="settings-data-title">当前角色数据</h3>
+                  <nav class="settings-list" aria-label="当前角色数据工具">
+                    <button id="export-mobile-data" type="button">
+                      <span aria-hidden="true">导</span>
+                      <span><strong>导出备份</strong><small>保存当前角色的完整小手机数据</small></span>
+                      <b aria-hidden="true">›</b>
+                    </button>
+                    <button id="restore-mobile-data" type="button">
+                      <span aria-hidden="true">复</span>
+                      <span><strong>恢复备份</strong><small>选择含 mobile-chat-backup.json 的目录</small></span>
+                      <b aria-hidden="true">›</b>
+                    </button>
+                    <button id="reset-mobile-data" class="danger" type="button">
+                      <span aria-hidden="true">清</span>
+                      <span><strong>重置小手机数据</strong><small>清空当前角色内容，保留已导入资源包</small></span>
                       <b aria-hidden="true">›</b>
                     </button>
                   </nav>
@@ -267,6 +310,7 @@
 
                   <form id="composer-form" class="composer">
                     <button id="continue-chat" class="continue-button" type="button" aria-label="让角色继续聊天" title="角色续聊">✦</button>
+                    <button id="open-sticker-picker" class="sticker-button" type="button" aria-label="发送表情" title="发送表情">☺</button>
                     <label class="sr-only" for="message-input">输入群聊消息</label>
                     <textarea id="message-input" rows="1" maxlength="500" placeholder="说点什么…" enterkeyhint="send"></textarea>
                     <button id="send-message" class="send-button" type="submit" aria-label="发送消息">↑</button>
@@ -691,6 +735,7 @@
 
               <nav class="resource-tabs" aria-label="表情与资源视图">
                 <button class="is-active" type="button" data-resource-tab="stickers">已导入表情</button>
+                <button type="button" data-resource-tab="backgrounds">手机背景</button>
                 <button type="button" data-resource-tab="manage">资源管理</button>
               </nav>
 
@@ -703,10 +748,29 @@
                   <small id="sticker-library-count">0 个可预览表情</small>
                 </div>
                 <div id="sticker-library-list" class="sticker-library-grid" aria-label="已导入表情"></div>
+                <button id="load-more-stickers" class="resource-load-more" type="button" hidden>加载更多表情</button>
                 <div id="sticker-library-empty" class="empty-state sticker-library-empty">
                   <span aria-hidden="true">贴</span>
                   <strong>还没有可浏览的表情</strong>
                   <p>在“资源管理”中导入自己的表情资源包；这里只展示安全内嵌的表情预览。</p>
+                  <button type="button" data-resource-tab="manage">前往资源管理</button>
+                </div>
+              </section>
+
+              <section id="background-library-panel" class="background-library-panel" aria-labelledby="background-library-heading" hidden>
+                <div class="sticker-library-heading">
+                  <div>
+                    <span>BACKGROUND LIBRARY</span>
+                    <strong id="background-library-heading">当前角色的背景</strong>
+                  </div>
+                  <small id="background-library-count">0 个可用背景</small>
+                </div>
+                <div id="background-library-list" class="background-library-grid" aria-label="已导入背景"></div>
+                <button id="load-more-backgrounds" class="resource-load-more" type="button" hidden>加载更多背景</button>
+                <div id="background-library-empty" class="empty-state sticker-library-empty">
+                  <span aria-hidden="true">景</span>
+                  <strong>还没有可用背景</strong>
+                  <p>在“资源管理”中导入自己的背景资源包，再从这里应用到小手机。</p>
                   <button type="button" data-resource-tab="manage">前往资源管理</button>
                 </div>
               </section>
@@ -980,6 +1044,25 @@
           <button id="confirm-resource-import" class="primary-button" type="submit">确认导入</button>
         </footer>
       </form>
+    </dialog>
+
+    <dialog id="sticker-picker-dialog" class="mobile-dialog sticker-picker-dialog">
+      <div>
+        <header>
+          <div>
+            <p class="dialog-overline">STICKER PICKER</p>
+            <h2>发送表情</h2>
+          </div>
+          <button class="dialog-close" type="button" data-close-dialog="sticker-picker-dialog" aria-label="关闭">×</button>
+        </header>
+        <div id="sticker-picker-list" class="sticker-picker-grid" aria-label="选择表情"></div>
+        <button id="load-more-picker-stickers" class="resource-load-more picker-load-more" type="button" hidden>加载更多表情</button>
+        <div id="sticker-picker-empty" class="empty-state sticker-picker-empty">
+          <span aria-hidden="true">贴</span>
+          <strong>没有可发送的表情</strong>
+          <p>先在资源页导入自己的表情包。</p>
+        </div>
+      </div>
     </dialog>
 
     <dialog id="confirm-dialog" class="mobile-dialog confirm-dialog">

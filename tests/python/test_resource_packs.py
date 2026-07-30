@@ -93,6 +93,34 @@ def make_pack(
     return root
 
 
+def make_mixed_pack(root: Path) -> Path:
+    root.mkdir()
+    assets = {
+        "assets/sticker.png": png_bytes(),
+        "assets/background.png": png_bytes(18, 48, 86),
+    }
+    for relative_path, payload in assets.items():
+        target = root.joinpath(*relative_path.split("/"))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+    value = manifest()
+    value["assets"] = [
+        value["assets"][0],
+        {
+            "id": "night-background",
+            "kind": "background",
+            "path": "assets/background.png",
+            "mediaType": "image/png",
+            "alt": "深蓝夜空",
+        },
+    ]
+    (root / "resource-pack.json").write_text(
+        json.dumps(value),
+        encoding="utf-8",
+    )
+    return root
+
+
 def grant(service: MobileChatService, selected: Path, token: str = TOKEN) -> str:
     assert service.store is not None
     grants = service.store.workspace_root / "input-directory-grants"
@@ -391,3 +419,94 @@ def test_damaged_installed_pack_does_not_break_text_chat(
         "mobile.resources.delete",
         {"context": context(), "packId": "com.example.fixture"},
     )["deleted"] is True
+
+
+def test_appearance_is_per_card_and_background_falls_back_after_delete(
+    service: MobileChatService,
+    tmp_path: Path,
+) -> None:
+    selected = make_mixed_pack(tmp_path / "mixed-pack")
+    install(service, selected)
+
+    updated = service.dispatch(
+        "mobile.appearance.update",
+        {
+            "context": context(),
+            "appearance": {
+                "preset": "xianxia",
+                "tone": "mist",
+                "background": {
+                    "packId": "com.example.fixture",
+                    "assetId": "night-background",
+                },
+            },
+        },
+    )
+    assert updated["appearance"]["preset"] == "xianxia"
+    assert updated["appearance"]["tone"] == "mist"
+    assert updated["backgroundAsset"]["dataUrl"].startswith("data:image/png;base64,")
+    catalog = service.dispatch(
+        "mobile.resources.assets.list",
+        {"context": context(), "kind": "sticker", "offset": 0, "limit": 24},
+    )
+    assert catalog["total"] == 1
+    assert catalog["assets"][0]["packId"] == "com.example.fixture"
+    for field, value in (("offset", "later"), ("limit", 2.5), ("limit", True)):
+        with pytest.raises(DomainError) as invalid_page:
+            service.dispatch(
+                "mobile.resources.assets.list",
+                {
+                    "context": context(),
+                    "kind": "sticker",
+                    "offset": 0,
+                    "limit": 24,
+                    field: value,
+                },
+            )
+        assert invalid_page.value.code == "invalid_params"
+    resolved = service.dispatch(
+        "mobile.resources.asset.get",
+        {
+            "context": context(),
+            "packId": "com.example.fixture",
+            "assetId": "rain-sticker",
+            "kind": "sticker",
+        },
+    )
+    assert resolved["asset"]["dataUrl"].startswith("data:image/png;base64,")
+
+    bob = character("card_b", "Bob")
+    service.dispatch(
+        "mobile.context.bind",
+        {
+            "context": context("card_b", "revision_b"),
+            "activeCharacter": bob,
+            "characters": [bob],
+        },
+    )
+    assert service.dispatch(
+        "mobile.appearance.get",
+        {"context": context("card_b", "revision_b")},
+    )["appearance"] == {
+        "schemaVersion": 1,
+        "preset": "modern",
+        "tone": "midnight",
+        "background": None,
+    }
+
+    alice = character()
+    service.dispatch(
+        "mobile.context.bind",
+        {
+            "context": context(),
+            "activeCharacter": alice,
+            "characters": [alice],
+        },
+    )
+    service.dispatch(
+        "mobile.resources.delete",
+        {"context": context(), "packId": "com.example.fixture"},
+    )
+    fallback = service.dispatch("mobile.appearance.get", {"context": context()})
+    assert fallback["appearance"]["background"] is None
+    assert fallback["fallback"] == "background_missing"

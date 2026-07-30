@@ -262,3 +262,42 @@ def test_commit_accepts_common_model_aliases(
         "Alias response",
         "Accepted.",
     ]
+
+
+def test_sticker_message_uses_stable_reference_and_text_prompt_placeholder(
+    service: MobileChatService,
+    group_payload: dict[str, Any],
+) -> None:
+    group_id = create_group(service, group_payload)
+    created = service.dispatch(
+        "mobile.messages.sticker.create",
+        {
+            "context": context(),
+            "groupId": group_id,
+            "sticker": {
+                "packId": "com.example.fixture",
+                "assetId": "rain-sticker",
+                "alt": "开心",
+            },
+        },
+    )["message"]
+    assert created["type"] == "sticker"
+    assert created["content"] == "[表情：开心]"
+    assert created["sticker"] == {
+        "packId": "com.example.fixture",
+        "assetId": "rain-sticker",
+        "alt": "开心",
+    }
+
+    prepared = service.dispatch(
+        "mobile.chat.prepare",
+        {
+            "context": context(),
+            "groupId": group_id,
+            "mode": "continue",
+        },
+    )
+    request_text = str(prepared["request"])
+    assert "[表情：开心]" in request_text
+    assert "com.example.fixture" not in request_text
+    assert "rain-sticker" not in request_text

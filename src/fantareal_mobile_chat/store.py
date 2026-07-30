@@ -1,19 +1,27 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
+import shutil
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
-from .directory_grants import resolve_directory_grant
+from .directory_grants import is_link_or_reparse, resolve_directory_grant
 from .domain import (
     ContextRef,
     DomainError,
+    mapping,
+    normalize_appearance,
     normalize_character,
     normalize_context,
     normalize_group,
     normalize_message,
     now_iso,
+    sequence,
+    text,
 )
 from .filesystem import atomic_write_json
 from .interactive_apps import (
@@ -160,7 +168,7 @@ class MobileStore:
         self._write_groups(ref.card_uid, remaining)
         self._messages_path(ref.card_uid, group_id).unlink(missing_ok=True)
 
-    def list_messages(self, context: Any, group_id: str) -> list[dict[str, str]]:
+    def list_messages(self, context: Any, group_id: str) -> list[dict[str, Any]]:
         ref = self.require_context(context)
         self._validate_group_id(group_id)
         payload = self._read_json(
@@ -181,7 +189,7 @@ class MobileStore:
         context: Any,
         group_id: str,
         entries: list[dict[str, Any]],
-    ) -> list[dict[str, str]]:
+    ) -> list[dict[str, Any]]:
         ref = self.require_context(context)
         self.get_group(ref.to_dict(), group_id)
         normalized = [normalize_message(item) for item in entries]
@@ -193,6 +201,100 @@ class MobileStore:
         ref = self.require_context(context)
         self.get_group(ref.to_dict(), group_id)
         self._write_messages(ref.card_uid, group_id, [])
+
+    def get_appearance(self, context: Any) -> dict[str, Any]:
+        ref = self.require_context(context)
+        return normalize_appearance(
+            self._read_json(self._appearance_path(ref.card_uid), {})
+        )
+
+    def update_appearance(self, context: Any, value: Any) -> dict[str, Any]:
+        ref = self.require_context(context)
+        current = self.get_appearance(ref.to_dict())
+        source = mapping(value, field="appearance")
+        appearance = normalize_appearance({**current, **source})
+        self._write_json(self._appearance_path(ref.card_uid), appearance)
+        return appearance
+
+    def export_card(self, context: Any) -> dict[str, Any]:
+        ref = self.require_context(context)
+        groups = [
+            self._without_last(item) for item in self.list_groups(ref.to_dict())
+        ]
+        data = {
+            "groups": groups,
+            "messages": {
+                group["groupId"]: self.list_messages(
+                    ref.to_dict(),
+                    group["groupId"],
+                )
+                for group in groups
+            },
+            "diary": self.list_diary_entries(ref.to_dict()),
+            "calendar": self.list_calendar_events(ref.to_dict()),
+            "feed": self.list_feed_posts(ref.to_dict()),
+            "forum": self.list_forum_threads(ref.to_dict()),
+            "mail": self.list_mail_threads(ref.to_dict()),
+            "phone": self.list_phone_sessions(ref.to_dict()),
+            "live": self.list_live_streams(ref.to_dict()),
+            "assistant": self.list_character_drafts(ref.to_dict()),
+            "notifications": self.list_notifications(ref.to_dict()),
+            "promptProfiles": self.list_prompt_profiles(ref.to_dict()),
+            "promptDiagnostics": self.list_prompt_diagnostics(ref.to_dict()),
+            "appearance": self.get_appearance(ref.to_dict()),
+        }
+        return {
+            "schemaVersion": 1,
+            "kind": "fantareal.mobile-chat.backup",
+            "sourceCardUid": ref.card_uid,
+            "exportedAt": now_iso(),
+            "includes": [
+                "groups",
+                "messages",
+                "lightApps",
+                "notifications",
+                "promptProfiles",
+                "appearanceReferences",
+            ],
+            "excludes": ["resourceAssetBytes", "apiKeys", "hostPrivateData"],
+            "data": data,
+        }
+
+    def preview_restore(self, context: Any, directory_token: str) -> dict[str, Any]:
+        ref = self.require_context(context)
+        raw, digest = self._read_backup(directory_token)
+        backup = self._normalize_backup(raw, ref.card_uid)
+        return {
+            **self._backup_summary(backup),
+            "directoryToken": directory_token,
+            "contentDigest": digest,
+        }
+
+    def apply_restore(
+        self,
+        context: Any,
+        directory_token: str,
+        expected_digest: str,
+    ) -> dict[str, Any]:
+        ref = self.require_context(context)
+        raw, digest = self._read_backup(directory_token)
+        if not expected_digest or digest != expected_digest:
+            raise DomainError(
+                "backup_changed",
+                "备份在预览后发生变化，请重新选择并确认",
+            )
+        backup = self._normalize_backup(raw, ref.card_uid)
+        self._replace_card_data(ref.card_uid, backup["data"])
+        return self._backup_summary(backup)
+
+    def reset_card(self, context: Any) -> dict[str, Any]:
+        ref = self.require_context(context)
+        self._replace_card_data(ref.card_uid, self._empty_card_data())
+        return {
+            "reset": True,
+            "cardUid": ref.card_uid,
+            "retained": ["resourcePacks"],
+        }
 
     def list_diary_entries(self, context: Any) -> list[dict[str, Any]]:
         ref = self.require_context(context)
@@ -1097,6 +1199,231 @@ class MobileStore:
                     path.unlink()
         return {"groupCount": len(imported_groups), "messageCount": imported_message_count}
 
+    def _read_backup(self, directory_token: str) -> tuple[Any, str]:
+        grant = resolve_directory_grant(self.workspace_root, directory_token)
+        path = grant.root / "mobile-chat-backup.json"
+        if (
+            not path.is_file()
+            or is_link_or_reparse(path)
+            or path.stat().st_size > 64 * 1024 * 1024
+        ):
+            raise DomainError(
+                "backup_invalid",
+                "所选目录中没有安全的 mobile-chat-backup.json",
+            )
+        try:
+            payload = path.read_bytes()
+            value = json.loads(payload.decode("utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise DomainError("backup_invalid", "备份文件无法读取或解析") from exc
+        return value, hashlib.sha256(payload).hexdigest()
+
+    @staticmethod
+    def _normalize_backup(value: Any, card_uid: str) -> dict[str, Any]:
+        source = mapping(value, field="backup")
+        allowed = {
+            "schemaVersion",
+            "kind",
+            "sourceCardUid",
+            "exportedAt",
+            "includes",
+            "excludes",
+            "data",
+        }
+        if (
+            set(source) - allowed
+            or source.get("schemaVersion") != 1
+            or source.get("kind") != "fantareal.mobile-chat.backup"
+            or source.get("sourceCardUid") != card_uid
+        ):
+            raise DomainError(
+                "backup_invalid",
+                "备份格式无效或不属于当前角色",
+            )
+        data = mapping(source.get("data"), field="backup.data")
+        required = {
+            "groups",
+            "messages",
+            "diary",
+            "calendar",
+            "feed",
+            "forum",
+            "mail",
+            "phone",
+            "live",
+            "assistant",
+            "notifications",
+            "promptProfiles",
+            "promptDiagnostics",
+            "appearance",
+        }
+        if set(data) != required:
+            raise DomainError("backup_invalid", "备份数据字段不完整")
+
+        groups = [normalize_group(item) for item in sequence(data["groups"], field="groups")]
+        group_ids = [item["groupId"] for item in groups]
+        if len(set(group_ids)) != len(group_ids):
+            raise DomainError("backup_invalid", "备份群聊 ID 重复")
+        raw_messages = mapping(data["messages"], field="messages")
+        if set(raw_messages) - set(group_ids):
+            raise DomainError("backup_invalid", "备份包含未知群聊消息")
+        messages = {
+            group_id: [
+                normalize_message(item)
+                for item in sequence(raw_messages.get(group_id, []), field="messages")
+            ]
+            for group_id in group_ids
+        }
+
+        def rows(key: str, normalizer: Any) -> list[dict[str, Any]]:
+            return [
+                normalizer(item)
+                for item in sequence(data[key], field=f"backup.data.{key}")
+            ]
+
+        normalized_data = {
+            "groups": groups,
+            "messages": messages,
+            "diary": rows("diary", normalize_diary_entry),
+            "calendar": rows("calendar", normalize_calendar_event),
+            "feed": rows("feed", normalize_feed_post),
+            "forum": rows("forum", normalize_forum_thread),
+            "mail": rows("mail", normalize_mail_thread),
+            "phone": rows("phone", normalize_phone_session),
+            "live": rows("live", normalize_live_stream),
+            "assistant": rows("assistant", normalize_character_draft),
+            "notifications": rows("notifications", normalize_notification),
+            "promptProfiles": rows("promptProfiles", normalize_prompt_profile),
+            "promptDiagnostics": rows(
+                "promptDiagnostics",
+                normalize_prompt_diagnostic,
+            ),
+            "appearance": normalize_appearance(data["appearance"]),
+        }
+        return {
+            "schemaVersion": 1,
+            "kind": "fantareal.mobile-chat.backup",
+            "sourceCardUid": card_uid,
+            "exportedAt": text(source.get("exportedAt"), 80),
+            "includes": source.get("includes", []),
+            "excludes": source.get("excludes", []),
+            "data": normalized_data,
+        }
+
+    @staticmethod
+    def _backup_summary(backup: dict[str, Any]) -> dict[str, Any]:
+        data = backup["data"]
+        return {
+            "sourceCardUid": backup["sourceCardUid"],
+            "exportedAt": backup["exportedAt"],
+            "groupCount": len(data["groups"]),
+            "messageCount": sum(len(items) for items in data["messages"].values()),
+            "lightAppItemCount": sum(
+                len(data[key])
+                for key in (
+                    "diary",
+                    "calendar",
+                    "feed",
+                    "forum",
+                    "mail",
+                    "phone",
+                    "live",
+                    "assistant",
+                    "notifications",
+                )
+            ),
+            "includes": backup.get("includes", []),
+            "excludes": backup.get("excludes", []),
+        }
+
+    @staticmethod
+    def _empty_card_data() -> dict[str, Any]:
+        return {
+            "groups": [],
+            "messages": {},
+            "diary": [],
+            "calendar": [],
+            "feed": [],
+            "forum": [],
+            "mail": [],
+            "phone": [],
+            "live": [],
+            "assistant": [],
+            "notifications": [],
+            "promptProfiles": [],
+            "promptDiagnostics": [],
+            "appearance": normalize_appearance(None),
+        }
+
+    def _replace_card_data(self, card_uid: str, data: dict[str, Any]) -> None:
+        root = self._card_root(card_uid)
+        nonce = uuid4().hex
+        stage = self.cards_root / f".{card_uid}.{nonce}.stage"
+        backup = self.cards_root / f".{card_uid}.{nonce}.backup"
+        self._remove_owned_tree(stage)
+        self._remove_owned_tree(backup)
+        (stage / "messages").mkdir(parents=True)
+        try:
+            self._write_card_data(stage, data)
+            os.replace(root, backup)
+            try:
+                os.replace(stage, root)
+            except OSError as exc:
+                os.replace(backup, root)
+                raise DomainError(
+                    "storage_write_failed",
+                    "无法原子替换当前角色数据",
+                ) from exc
+            self._remove_owned_tree(backup)
+        except Exception:
+            self._remove_owned_tree(stage)
+            if backup.exists() and not root.exists():
+                os.replace(backup, root)
+            raise
+
+    @staticmethod
+    def _write_card_data(root: Path, data: dict[str, Any]) -> None:
+        atomic_write_json(
+            root / "groups.json",
+            {"schemaVersion": 1, "groups": data["groups"]},
+        )
+        for group_id, messages in data["messages"].items():
+            atomic_write_json(
+                root / "messages" / f"{group_id}.json",
+                {"schemaVersion": 1, "messages": messages},
+            )
+        for filename, key, data_key in (
+            ("diary.json", "entries", "diary"),
+            ("calendar.json", "events", "calendar"),
+            ("feed.json", "posts", "feed"),
+            ("forum.json", "threads", "forum"),
+            ("mail.json", "threads", "mail"),
+            ("phone.json", "sessions", "phone"),
+            ("live.json", "streams", "live"),
+            ("assistant.json", "drafts", "assistant"),
+            ("notifications.json", "notifications", "notifications"),
+        ):
+            atomic_write_json(
+                root / filename,
+                {"schemaVersion": 1, key: data[data_key]},
+            )
+        atomic_write_json(
+            root / "prompt-workbench.json",
+            {
+                "schemaVersion": 1,
+                "profiles": data["promptProfiles"],
+                "diagnostics": data["promptDiagnostics"],
+            },
+        )
+        atomic_write_json(root / "appearance.json", data["appearance"])
+
+    def _remove_owned_tree(self, path: Path) -> None:
+        resolved_parent = path.parent.resolve()
+        if resolved_parent != self.cards_root or not path.name.startswith("."):
+            raise DomainError("storage_unsafe", "临时数据路径越界")
+        if os.path.lexists(path):
+            shutil.rmtree(path)
+
     def _legacy_root(self, directory_token: str, card_uid: str) -> Path:
         selected = resolve_directory_grant(self.workspace_root, directory_token).root
         candidates = [
@@ -1112,7 +1439,7 @@ class MobileStore:
     def _read_legacy(
         self,
         root: Path,
-    ) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, str]]]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
         payload = self._read_json(root / "groups.json", [])
         rows = payload.get("groups", []) if isinstance(payload, dict) else payload
         groups = []
@@ -1121,7 +1448,7 @@ class MobileStore:
                 groups.append(normalize_group(item))
             except DomainError:
                 continue
-        messages: dict[str, list[dict[str, str]]] = {}
+        messages: dict[str, list[dict[str, Any]]] = {}
         for group in groups:
             message_payload = self._read_json(root / "messages" / f"{group['groupId']}.json", [])
             message_rows = (
@@ -1165,6 +1492,9 @@ class MobileStore:
         workbench = self._workbench_path(card_uid)
         if not workbench.exists():
             self._write_workbench(card_uid, [], [])
+        appearance = self._appearance_path(card_uid)
+        if not appearance.exists():
+            self._write_json(appearance, normalize_appearance(None))
 
     def _card_root(self, card_uid: str) -> Path:
         root = (self.cards_root / card_uid).resolve()
@@ -1211,6 +1541,9 @@ class MobileStore:
     def _notifications_path(self, card_uid: str) -> Path:
         return self._card_root(card_uid) / "notifications.json"
 
+    def _appearance_path(self, card_uid: str) -> Path:
+        return self._card_root(card_uid) / "appearance.json"
+
     @staticmethod
     def _validate_group_id(group_id: str) -> None:
         if not re.fullmatch(r"group_[a-z0-9][a-z0-9_-]{5,79}", group_id):
@@ -1234,7 +1567,7 @@ class MobileStore:
         self,
         card_uid: str,
         group_id: str,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
     ) -> None:
         self._write_json(
             self._messages_path(card_uid, group_id),

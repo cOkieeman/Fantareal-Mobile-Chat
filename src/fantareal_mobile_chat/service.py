@@ -16,6 +16,7 @@ from .domain import (
     system_error_message,
     text,
     user_message,
+    user_sticker_message,
 )
 from .interactive_apps import (
     build_live_request,
@@ -132,6 +133,26 @@ class MobileChatService:
                 text(params.get("groupId"), 86, required=True, field="groupId"),
             )
             return {"ok": True}
+        if method == "mobile.messages.sticker.create":
+            group_id = text(
+                params.get("groupId"),
+                86,
+                required=True,
+                field="groupId",
+            )
+            group = store.get_group(context, group_id)
+            message = user_sticker_message(group, params.get("sticker"))
+            return {
+                "message": store.append_messages(context, group_id, [message])[0]
+            }
+        if method == "mobile.appearance.get":
+            return self._appearance_payload(context)
+        if method == "mobile.appearance.update":
+            appearance = store.update_appearance(
+                context,
+                mapping(params.get("appearance"), field="appearance"),
+            )
+            return self._appearance_payload(context, appearance)
         if method == "mobile.diary.list":
             return {"entries": store.list_diary_entries(context)}
         if method == "mobile.diary.create":
@@ -576,6 +597,24 @@ class MobileChatService:
         if method == "mobile.resources.list":
             ref = store.require_context(context)
             return self._resource_packs().list_packs(ref.card_uid)
+        if method == "mobile.resources.assets.list":
+            ref = store.require_context(context)
+            return self._resource_packs().list_assets(
+                ref.card_uid,
+                text(params.get("kind"), 40, required=True, field="kind"),
+                offset=params.get("offset", 0),
+                limit=params.get("limit", 48),
+            )
+        if method == "mobile.resources.asset.get":
+            ref = store.require_context(context)
+            return {
+                "asset": self._resource_packs().get_asset(
+                    ref.card_uid,
+                    text(params.get("packId"), 120, required=True, field="packId"),
+                    text(params.get("assetId"), 120, required=True, field="assetId"),
+                    expected_kind=text(params.get("kind"), 40) or None,
+                )
+            }
         if method == "mobile.resources.preview":
             ref = store.require_context(context)
             return self._resource_packs().preview(
@@ -642,6 +681,40 @@ class MobileChatService:
                 ),
                 text(params.get("mode"), 20) or "merge",
             )
+        if method == "mobile.data.export":
+            return {"backup": store.export_card(context)}
+        if method == "mobile.data.restore.preview":
+            return store.preview_restore(
+                context,
+                text(
+                    params.get("directoryToken"),
+                    80,
+                    required=True,
+                    field="directoryToken",
+                ),
+            )
+        if method == "mobile.data.restore.apply":
+            result = store.apply_restore(
+                context,
+                text(
+                    params.get("directoryToken"),
+                    80,
+                    required=True,
+                    field="directoryToken",
+                ),
+                text(
+                    params.get("contentDigest"),
+                    64,
+                    required=True,
+                    field="contentDigest",
+                ),
+            )
+            self.pending.clear()
+            return result
+        if method == "mobile.data.reset":
+            result = store.reset_card(context)
+            self.pending.clear()
+            return result
         raise DomainError("method_not_found", f"不支持的 service method：{method[:120]}")
 
     def initialize(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -722,7 +795,15 @@ class MobileChatService:
                     store.active_character,
                     characters=member_characters,
                     groups=[group],
-                    recent_events=history[-12:],
+                    recent_events=[
+                        {
+                            "speakerId": item["speakerId"],
+                            "speakerName": item["speakerName"],
+                            "type": item["type"],
+                            "content": item["content"],
+                        }
+                        for item in history[-12:]
+                    ],
                     chat_context=store.chat_context,
                 ),
             ),
@@ -1446,6 +1527,41 @@ class MobileChatService:
         if self.resource_packs is None:
             raise DomainError("not_initialized", "资源服务尚未初始化")
         return self.resource_packs
+
+    def _appearance_payload(
+        self,
+        context: Any,
+        appearance: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        store = self._store()
+        ref = store.require_context(context)
+        current = appearance or store.get_appearance(context)
+        background = current.get("background")
+        if background is None:
+            return {"appearance": current, "backgroundAsset": None}
+        try:
+            asset = self._resource_packs().get_asset(
+                ref.card_uid,
+                background["packId"],
+                background["assetId"],
+                expected_kind="background",
+            )
+        except DomainError as exc:
+            if exc.code not in {
+                "resource_pack_not_found",
+                "resource_pack_invalid",
+                "resource_pack_unsafe",
+                "resource_pack_corrupt",
+                "resource_asset_not_found",
+            }:
+                raise
+            current = store.update_appearance(context, {"background": None})
+            return {
+                "appearance": current,
+                "backgroundAsset": None,
+                "fallback": "background_missing",
+            }
+        return {"appearance": current, "backgroundAsset": asset}
 
 
 class JsonRpcServer:

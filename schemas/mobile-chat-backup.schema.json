@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fantareal.local/schemas/mobile-chat/backup.schema.json",
+  "title": "Fantareal Mobile Chat Per-card Backup",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "sourceCardUid",
+    "exportedAt",
+    "includes",
+    "excludes",
+    "data"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "fantareal.mobile-chat.backup" },
+    "sourceCardUid": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$"
+    },
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "includes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "excludes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "groups",
+        "messages",
+        "diary",
+        "calendar",
+        "feed",
+        "forum",
+        "mail",
+        "phone",
+        "live",
+        "assistant",
+        "notifications",
+        "promptProfiles",
+        "promptDiagnostics",
+        "appearance"
+      ],
+      "properties": {
+        "groups": { "type": "array" },
+        "messages": {
+          "type": "object",
+          "additionalProperties": { "type": "array" }
+        },
+        "diary": { "type": "array" },
+        "calendar": { "type": "array" },
+        "feed": { "type": "array" },
+        "forum": { "type": "array" },
+        "mail": { "type": "array" },
+        "phone": { "type": "array" },
+        "live": { "type": "array" },
+        "assistant": { "type": "array" },
+        "notifications": { "type": "array" },
+        "promptProfiles": { "type": "array" },
+        "promptDiagnostics": { "type": "array" },
+        "appearance": { "$ref": "appearance.schema.json" }
+      }
+    }
+  }
+}

@@ -28,7 +28,7 @@
       "maxLength": 120
     },
     "type": {
-      "enum": ["text", "error"]
+      "enum": ["text", "error", "sticker"]
     },
     "content": {
       "type": "string",
@@ -41,6 +41,18 @@
     },
     "source": {
       "enum": ["user", "ai", "system", "import"]
+    },
+    "sticker": {
+      "$ref": "appearance.schema.json#/$defs/resourceRef"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "type": { "const": "sticker" } },
+        "required": ["type"]
+      },
+      "then": { "required": ["sticker"] }
+    }
+  ]
 }
