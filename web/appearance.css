@@ -1,0 +1,541 @@
+/*
+ * Visual-only appearance presets.
+ *
+ * These presets deliberately stop at the rendering boundary. They do not
+ * change labels, Prompt content, character behavior, or model requests.
+ * Chrome surfaces are opaque enough for Qt WebEngine and never rely on live
+ * backdrop blur.
+ */
+
+html[data-preset="modern"] {
+  --chrome-surface: rgba(18, 25, 35, 0.96);
+  --section-surface: rgba(13, 21, 31, 0.97);
+  --settings-canvas: #eef2f6;
+  --settings-surface: #ffffff;
+  --settings-surface-hover: #f3f7fb;
+  --settings-border: #d7e0e9;
+  --settings-text: #172233;
+  --settings-muted: #68778a;
+  --dialog-surface: #0d151f;
+  --dialog-control: rgba(255, 255, 255, 0.07);
+  --preset-hero:
+    radial-gradient(circle at 86% 8%, rgba(112, 157, 255, 0.34), transparent 38%),
+    linear-gradient(145deg, rgba(62, 91, 145, 0.38), rgba(255, 255, 255, 0.035));
+  --preset-bubble: linear-gradient(135deg, rgba(60, 108, 203, 0.98), rgba(68, 119, 221, 0.94));
+  --preset-device-glow: rgba(79, 131, 232, 0.15);
+  --preset-icon-radius: 16px;
+  --blue: #4f83e8;
+  --blue-strong: #3d72dc;
+  --blue-soft: rgba(79, 131, 232, 0.2);
+}
+
+html[data-preset="modern"][data-theme="mist"] {
+  --chrome-surface: rgba(247, 250, 253, 0.96);
+  --section-surface: rgba(235, 242, 249, 0.98);
+  --dialog-surface: #f5f8fc;
+  --dialog-control: rgba(25, 60, 103, 0.07);
+}
+
+html[data-preset="social"] {
+  color-scheme: dark;
+  --stage-bg: #090a0c;
+  --stage-grid: rgba(255, 255, 255, 0.025);
+  --stage-glow: rgba(95, 207, 122, 0.16);
+  --stage-text: #f1f3f5;
+  --panel: rgba(11, 12, 14, 0.99);
+  --panel-strong: rgba(19, 20, 23, 0.99);
+  --surface: rgba(42, 44, 48, 0.92);
+  --surface-strong: rgba(50, 52, 57, 0.96);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --muted: rgba(235, 239, 245, 0.52);
+  --text: #f1f3f5;
+  --blue: #5fcf7a;
+  --blue-strong: #45bd64;
+  --blue-soft: rgba(95, 207, 122, 0.18);
+  --green: #5fcf7a;
+  --shadow: rgba(0, 0, 0, 0.62);
+  --chrome-surface: rgba(24, 25, 28, 0.97);
+  --section-surface: rgba(24, 25, 28, 0.98);
+  --settings-canvas: #111214;
+  --settings-surface: #2a2c30;
+  --settings-surface-hover: #323439;
+  --settings-border: rgba(255, 255, 255, 0.1);
+  --settings-text: #f1f3f5;
+  --settings-muted: rgba(235, 239, 245, 0.55);
+  --dialog-surface: #18191c;
+  --dialog-control: #2a2c30;
+  --preset-hero:
+    radial-gradient(circle at 86% 8%, rgba(95, 207, 122, 0.22), transparent 38%),
+    linear-gradient(145deg, rgba(36, 75, 48, 0.44), rgba(38, 40, 44, 0.9));
+  --preset-bubble: #62c777;
+  --preset-device-glow: rgba(95, 207, 122, 0.14);
+  --preset-icon-radius: 16px;
+}
+
+html[data-preset="xianxia"] {
+  color-scheme: light;
+  --stage-bg: #e6d1a8;
+  --stage-grid: rgba(104, 68, 31, 0.055);
+  --stage-glow: rgba(154, 100, 43, 0.22);
+  --stage-text: #3c2a18;
+  --panel: rgba(232, 206, 157, 0.98);
+  --panel-strong: rgba(210, 164, 99, 0.99);
+  --surface: rgba(255, 242, 205, 0.38);
+  --surface-strong: rgba(255, 242, 210, 0.58);
+  --border: rgba(126, 86, 43, 0.3);
+  --border-strong: rgba(126, 86, 43, 0.42);
+  --muted: rgba(73, 51, 30, 0.66);
+  --text: #3c2a18;
+  --blue: #b97639;
+  --blue-strong: #8f5529;
+  --blue-soft: rgba(149, 91, 44, 0.2);
+  --green: #687f58;
+  --shadow: rgba(61, 38, 16, 0.38);
+  --chrome-surface: rgba(238, 211, 164, 0.96);
+  --section-surface: rgba(235, 207, 157, 0.98);
+  --settings-canvas: #f3e7cd;
+  --settings-surface: #fff2d2;
+  --settings-surface-hover: #f7dfb4;
+  --settings-border: rgba(126, 86, 43, 0.3);
+  --settings-text: #3c2a18;
+  --settings-muted: rgba(73, 51, 30, 0.66);
+  --dialog-surface: #f3dfb6;
+  --dialog-control: rgba(255, 242, 210, 0.68);
+  --preset-hero:
+    radial-gradient(circle at 84% 18%, rgba(94, 132, 83, 0.12), transparent 42%),
+    rgba(255, 236, 195, 0.62);
+  --preset-bubble: linear-gradient(135deg, #b97639, #d19249);
+  --preset-device-glow: rgba(122, 80, 35, 0.12);
+  --preset-icon-radius: 13px;
+}
+
+html[data-preset="apocalypse"] {
+  color-scheme: dark;
+  --stage-bg: #10130f;
+  --stage-grid: rgba(200, 216, 190, 0.035);
+  --stage-glow: rgba(181, 161, 93, 0.18);
+  --stage-text: #eef4e8;
+  --panel: rgba(19, 23, 20, 0.98);
+  --panel-strong: rgba(13, 16, 14, 0.99);
+  --surface: rgba(222, 232, 216, 0.07);
+  --surface-strong: rgba(222, 232, 216, 0.12);
+  --border: rgba(157, 176, 141, 0.25);
+  --border-strong: rgba(157, 176, 141, 0.36);
+  --muted: rgba(210, 222, 202, 0.64);
+  --text: #eef4e8;
+  --blue: #6f9361;
+  --blue-strong: #4f7548;
+  --blue-soft: rgba(111, 147, 97, 0.24);
+  --green: #b5a15d;
+  --shadow: rgba(0, 0, 0, 0.64);
+  --chrome-surface: rgba(22, 28, 23, 0.97);
+  --section-surface: rgba(18, 23, 19, 0.98);
+  --settings-canvas: #111611;
+  --settings-surface: #202720;
+  --settings-surface-hover: #293229;
+  --settings-border: rgba(157, 176, 141, 0.25);
+  --settings-text: #eef4e8;
+  --settings-muted: rgba(210, 222, 202, 0.64);
+  --dialog-surface: #161c17;
+  --dialog-control: rgba(222, 232, 216, 0.08);
+  --preset-hero:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 12px),
+    radial-gradient(circle at 86% 18%, rgba(215, 102, 82, 0.14), transparent 42%),
+    rgba(236, 239, 230, 0.06);
+  --preset-bubble: linear-gradient(135deg, #6f9361, #4f7548);
+  --preset-device-glow: rgba(181, 161, 93, 0.12);
+  --preset-icon-radius: 13px;
+}
+
+/* Device shell */
+
+html[data-preset="modern"] .device {
+  border-color: var(--border-strong);
+  background-image:
+    linear-gradient(rgba(13, 21, 31, 0.64), rgba(13, 21, 31, 0.84)),
+    var(--user-background-image, linear-gradient(transparent, transparent)),
+    radial-gradient(circle at 90% 4%, var(--preset-device-glow), transparent 15rem),
+    linear-gradient(145deg, #202e3d, #0d151f);
+}
+
+html[data-preset="social"] .device {
+  border-color: rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background-image:
+    linear-gradient(rgba(9, 10, 12, 0.58), rgba(9, 10, 12, 0.84)),
+    var(--user-background-image, linear-gradient(transparent, transparent)),
+    radial-gradient(circle at 90% 4%, var(--preset-device-glow), transparent 15rem),
+    linear-gradient(180deg, #0e0f12, #090a0c);
+}
+
+html[data-preset="xianxia"] .device {
+  border-color: rgba(126, 86, 43, 0.34);
+  background-image:
+    linear-gradient(rgba(234, 214, 170, 0.5), rgba(209, 169, 112, 0.72)),
+    var(--user-background-image, linear-gradient(transparent, transparent)),
+    repeating-linear-gradient(12deg, rgba(80, 48, 18, 0.035) 0 1px, transparent 1px 11px),
+    linear-gradient(145deg, #ead6aa, #d1a970 58%, #aa793f);
+}
+
+html[data-preset="apocalypse"] .device {
+  border-color: rgba(162, 176, 148, 0.24);
+  background-image:
+    linear-gradient(rgba(10, 12, 11, 0.56), rgba(10, 12, 11, 0.82)),
+    var(--user-background-image, linear-gradient(transparent, transparent)),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.024) 0 1px, transparent 1px 13px),
+    linear-gradient(145deg, #191d19, #0a0c0b);
+}
+
+html[data-preset] .device-header,
+html[data-preset] .app-navigation {
+  background: var(--chrome-surface);
+  border-color: var(--border);
+}
+
+html[data-preset] .panel-header,
+html[data-preset] .chat-header {
+  background: var(--section-surface);
+  border-color: var(--border);
+}
+
+html[data-preset="social"] .app-navigation button[aria-current="page"] {
+  background: rgba(95, 207, 122, 0.2);
+  border-color: rgba(95, 207, 122, 0.24);
+}
+
+html[data-preset="xianxia"] .app-navigation button[aria-current="page"] {
+  background: rgba(149, 91, 44, 0.2);
+  border-color: rgba(126, 86, 43, 0.26);
+}
+
+html[data-preset="apocalypse"] .app-navigation button[aria-current="page"] {
+  background: rgba(111, 147, 97, 0.24);
+  border-color: rgba(157, 176, 141, 0.24);
+}
+
+html[data-preset="social"] .device-mark {
+  background: linear-gradient(145deg, #5fcf7a, #309a4d);
+  border-color: rgba(149, 235, 168, 0.38);
+}
+
+html[data-preset="xianxia"] .device-mark {
+  background: linear-gradient(145deg, #c99a56, #876136);
+  border-color: rgba(126, 86, 43, 0.34);
+}
+
+html[data-preset="apocalypse"] .device-mark {
+  background: linear-gradient(145deg, #d76652, #6d3a31);
+  border-color: rgba(215, 102, 82, 0.34);
+}
+
+html[data-preset="xianxia"] .device-footer span[data-tone="error"] {
+  color: #873b32;
+}
+
+/* Home and app drawer */
+
+html[data-preset="modern"] .home-hero {
+  background: var(--preset-hero);
+}
+
+html[data-preset="social"] .home-hero {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: var(--preset-hero);
+}
+
+html[data-preset="xianxia"] .home-hero {
+  border-color: rgba(126, 86, 43, 0.28);
+  background:
+    radial-gradient(circle at 84% 18%, rgba(94, 132, 83, 0.12), transparent 42%),
+    rgba(255, 236, 195, 0.62);
+}
+
+html[data-preset="apocalypse"] .home-hero {
+  border-color: rgba(215, 102, 82, 0.28);
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 12px),
+    radial-gradient(circle at 86% 18%, rgba(215, 102, 82, 0.14), transparent 42%),
+    rgba(236, 239, 230, 0.06);
+}
+
+html[data-preset="xianxia"] .home-time,
+html[data-preset="xianxia"] .home-time-stack strong,
+html[data-preset="xianxia"] .weather strong {
+  color: #3c2a18;
+  text-shadow: none;
+}
+
+html[data-preset="xianxia"] .app-grid button,
+html[data-preset="apocalypse"] .app-grid button {
+  padding: 6px 2px;
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+html[data-preset="xianxia"] .app-grid button:hover:not(:disabled),
+html[data-preset="xianxia"] .app-grid button:focus-visible {
+  border-color: rgba(142, 91, 38, 0.52);
+  background: rgba(255, 242, 210, 0.58);
+}
+
+html[data-preset="apocalypse"] .app-grid button:hover:not(:disabled),
+html[data-preset="apocalypse"] .app-grid button:focus-visible {
+  border-color: rgba(215, 102, 82, 0.54);
+  background: rgba(215, 102, 82, 0.12);
+}
+
+html[data-preset="xianxia"] .app-icon-chat,
+html[data-preset="xianxia"] .app-icon-assistant,
+html[data-preset="xianxia"] .app-icon-workbench {
+  background: linear-gradient(145deg, #c99a56, #876136);
+}
+
+html[data-preset="xianxia"] .app-icon-settings,
+html[data-preset="xianxia"] .app-icon-sticker {
+  background: linear-gradient(145deg, #8f9b76, #5e6f52);
+}
+
+html[data-preset="xianxia"] .app-icon-forum,
+html[data-preset="xianxia"] .app-icon-diary {
+  background: linear-gradient(145deg, #8d7ad8, #6951b7);
+}
+
+html[data-preset="xianxia"] .app-icon-notification,
+html[data-preset="xianxia"] .app-icon-mail {
+  background: linear-gradient(145deg, #cf9c4e, #a66d38);
+}
+
+html[data-preset="xianxia"] .app-icon-feed,
+html[data-preset="xianxia"] .app-icon-phone,
+html[data-preset="xianxia"] .app-icon-calendar,
+html[data-preset="xianxia"] .app-icon-live {
+  background: linear-gradient(145deg, #65b8a3, #397f78);
+}
+
+html[data-preset="apocalypse"] .app-icon-chat,
+html[data-preset="apocalypse"] .app-icon-assistant,
+html[data-preset="apocalypse"] .app-icon-workbench {
+  background: linear-gradient(145deg, #d76652, #8f3d33);
+}
+
+html[data-preset="apocalypse"] .app-icon-settings,
+html[data-preset="apocalypse"] .app-icon-sticker {
+  background: linear-gradient(145deg, #82916d, #4b6248);
+}
+
+html[data-preset="apocalypse"] .app-icon-forum,
+html[data-preset="apocalypse"] .app-icon-diary {
+  background: linear-gradient(145deg, #7e8790, #4c555e);
+}
+
+html[data-preset="apocalypse"] .app-icon-notification,
+html[data-preset="apocalypse"] .app-icon-mail {
+  background: linear-gradient(145deg, #d76652, #a34c3e);
+}
+
+html[data-preset="apocalypse"] .app-icon-feed,
+html[data-preset="apocalypse"] .app-icon-phone,
+html[data-preset="apocalypse"] .app-icon-calendar,
+html[data-preset="apocalypse"] .app-icon-live {
+  background: linear-gradient(145deg, #51a99c, #336f68);
+}
+
+/* Chat room */
+
+html[data-preset] .chat-layout,
+html[data-preset] .group-panel,
+html[data-preset] .conversation-panel {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--panel-strong) 94%, transparent);
+}
+
+html[data-preset="social"] .message p {
+  color: #f0f2f5;
+  background: #2a2c30;
+  border-color: transparent;
+  border-radius: 8px;
+}
+
+html[data-preset="social"] .message.outgoing p {
+  color: #08190e;
+  background: #62c777;
+  border-color: transparent;
+  border-radius: 8px;
+}
+
+html[data-preset="xianxia"] .message p {
+  color: #3c2a18;
+  background: rgba(255, 242, 210, 0.58);
+  border-color: rgba(126, 86, 43, 0.24);
+}
+
+html[data-preset="xianxia"] .message.outgoing p {
+  color: #fff8ec;
+  background: linear-gradient(135deg, #b97639, #d19249);
+  border-color: rgba(143, 85, 41, 0.42);
+}
+
+html[data-preset="apocalypse"] .message p {
+  color: #eef4e8;
+  background: rgba(222, 232, 216, 0.1);
+  border-color: rgba(157, 176, 141, 0.2);
+}
+
+html[data-preset="apocalypse"] .message.outgoing p {
+  color: #ffffff;
+  background: linear-gradient(135deg, #6f9361, #4f7548);
+  border-color: rgba(181, 161, 93, 0.3);
+}
+
+html[data-preset="social"] .composer {
+  background: #24262a;
+  border-color: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+html[data-preset="xianxia"] .composer {
+  background: rgba(255, 242, 210, 0.72);
+  border-color: rgba(126, 86, 43, 0.25);
+}
+
+html[data-preset="apocalypse"] .composer {
+  background: rgba(22, 28, 23, 0.98);
+  border-color: rgba(157, 176, 141, 0.22);
+}
+
+/* Settings and modal controls */
+
+html[data-preset] .settings-screen {
+  color: var(--settings-text);
+  background: var(--settings-canvas);
+}
+
+html[data-preset] .settings-header,
+html[data-preset] .settings-profile,
+html[data-preset] .settings-list,
+html[data-preset] .appearance-background-row,
+html[data-preset] .appearance-preset-grid button {
+  color: var(--settings-text);
+  background: var(--settings-surface);
+  border-color: var(--settings-border);
+}
+
+html[data-preset] .settings-header h2,
+html[data-preset] .settings-profile strong,
+html[data-preset] .settings-list button,
+html[data-preset] .appearance-background-row strong {
+  color: var(--settings-text);
+}
+
+html[data-preset] .settings-header span,
+html[data-preset] .settings-profile p,
+html[data-preset] .settings-group h3,
+html[data-preset] .settings-list small,
+html[data-preset] .appearance-preset-grid small,
+html[data-preset] .appearance-background-row small,
+html[data-preset] .appearance-boundary {
+  color: var(--settings-muted);
+}
+
+html[data-preset] .settings-list button {
+  background: var(--settings-surface);
+  border-color: var(--settings-border);
+}
+
+html[data-preset] .settings-list button:hover,
+html[data-preset] .settings-list button:focus-visible {
+  background: var(--settings-surface-hover);
+}
+
+html[data-preset] .appearance-preset-grid button.is-active {
+  color: var(--blue-strong);
+  background: color-mix(in srgb, var(--blue-soft) 70%, var(--settings-surface));
+  border-color: var(--blue);
+}
+
+html[data-preset] .settings-note {
+  color: var(--settings-muted);
+  background: color-mix(in srgb, var(--settings-surface) 82%, var(--settings-canvas));
+  border-color: var(--settings-border);
+}
+
+html[data-preset] .settings-note strong {
+  color: var(--settings-text);
+}
+
+html[data-preset] .mobile-dialog {
+  color: var(--text);
+  background: var(--dialog-surface);
+  border-color: var(--border-strong);
+}
+
+html[data-preset] .mobile-dialog input[type="text"],
+html[data-preset] .mobile-dialog input:not([type]),
+html[data-preset] .mobile-dialog textarea,
+html[data-preset] .mobile-dialog select,
+html[data-preset] .dialog-close {
+  color: var(--text);
+  background: var(--dialog-control);
+  border-color: var(--border);
+}
+
+html[data-preset="xianxia"] .dialog-overline {
+  color: #8f5529;
+}
+
+html[data-preset="apocalypse"] .dialog-overline {
+  color: #b5a15d;
+}
+
+/* Dedicated light apps keep their layouts and receive the old theme material. */
+
+html[data-preset="xianxia"] :is(
+  .feed-screen,
+  .forum-screen,
+  .mail-screen,
+  .diary-screen,
+  .calendar-screen,
+  .notifications-screen
+) {
+  background: #f7f0df;
+}
+
+html[data-preset="apocalypse"] :is(
+  .feed-screen,
+  .forum-screen,
+  .mail-screen,
+  .diary-screen,
+  .calendar-screen,
+  .notifications-screen
+) {
+  background: #e8ece0;
+}
+
+html[data-preset="xianxia"] .mail-topbar {
+  background: linear-gradient(135deg, #6f4c2e, #a97942);
+}
+
+html[data-preset="apocalypse"] .mail-topbar {
+  background: linear-gradient(135deg, #2f4638, #6f7545);
+}
+
+html[data-preset="xianxia"] .forum-list-view,
+html[data-preset="xianxia"] .light-app-list {
+  background: #f7f0df;
+  border-color: rgba(126, 86, 43, 0.24);
+}
+
+html[data-preset="apocalypse"] .forum-list-view,
+html[data-preset="apocalypse"] .light-app-list {
+  background: #e8ece0;
+  border-color: rgba(111, 147, 97, 0.28);
+}
+
+html[data-preset] .live-thought-card {
+  background: color-mix(in srgb, var(--panel-strong) 94%, var(--surface));
+}
+
+html[data-preset] .live-current .mc6-compose {
+  background: var(--section-surface);
+}

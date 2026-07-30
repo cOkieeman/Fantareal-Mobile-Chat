@@ -4,7 +4,7 @@ Fantareal 新 PC 的“小手机”Extension。`0.9.0-rc.2` 是完成 MC1–MC9 
 
 ## 当前范围
 
-- `fantareal-extension.json`：Host API 1.3 Web page + Python service manifest，声明模型、`storage.assets` 与用户选择目录权限。
+- `fantareal-extension.json`：Host API 1.4 Web page + Python service manifest，声明模型、`storage.assets`、用户选择目录读取与安全文件保存权限。
 - `web/`：可切换 compact/expanded 的群聊、轻应用与角色资源管理 UI；两个形态复用同一 DOM、router 与状态。
 - `src/fantareal_mobile_chat/`：不联网的 JSON-RPC 2.0 stdio service、per-card 原子 JSON 存储与严格资源包导入。
 - `src/fantareal_mobile_chat/prompts/`：随 wheel 打包的群聊与各轻应用生成契约。
@@ -60,7 +60,19 @@ uv run --locked python tools/build_release.py --output-dir dist
 - 运行数据只写入 Host 提供的 namespaced `storage.data/cards/<cardUid>/`。
 - 用户资源只写入 `storage.assets/cards/<cardUid>/resource-packs/<packId>/`；损坏资源不会阻断文本聊天。
 - 资源包必须声明名称、来源与是否允许再分发；预览后内容发生变化会拒绝导入。
+- 四套视觉 preset 与明暗层只改变 CSS 材质和颜色，不修改 Prompt、模型请求或 RP 世界风格；背景和表情选择也不会自动调用模型。
+- 表情消息只保存 `packId + assetId + alt` 稳定引用；Prompt 仅接收 `[表情：说明]` 文本占位，不包含资源路径、二进制或 data URL。
+- `avatar-decoration` 仅为旧资源包兼容导入值，已经 deprecated；当前产品不提供选择或应用入口，新资源包应只使用 `sticker` 与 `background`。
 - 旧数据只允许由用户显式选择目录后导入，插件不得自动扫描旧 WebUI。
+
+### 当前角色数据备份与重置
+
+- 备份对象包含当前角色的群组、消息、日记、日程、动态、论坛、邮箱、电话、直播、人物辅助草稿、通知、Prompt profile、视觉 preset 和资源引用。
+- 备份不包含资源图片本体、API Key、Host 私有角色卡/数据库或其他角色的数据；恢复时缺失的背景与表情会安全回退。
+- 设置页可从用户授权且包含 `mobile-chat-backup.json` 的目录执行“预览 → 核对摘要 → 确认恢复”。
+- “重置当前角色小手机数据”会清除上述业务数据、Prompt profile 与外观选择，但保留已导入资源包；删除资源包是独立操作。
+- 设置页“导出备份”先从 service 获取当前角色的备份对象，再调用 Host `saveFile()` 打开系统保存对话框；插件不能指定任意绝对路径，成功结果也不包含用户路径。
+- 导出文件固定建议名为 `mobile-chat-backup.json`，使用 UTF-8 JSON；取消保存不会产生文件，写入由 Host 原子提交。
 
 ## License 状态
 

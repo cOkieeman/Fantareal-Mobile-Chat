@@ -6,13 +6,13 @@ import test from "node:test";
 const root = path.resolve(import.meta.dirname, "..");
 const manifestPath = path.join(root, "fantareal-extension.json");
 
-test("manifest matches the Host API 1.3 application-window contract", async () => {
+test("manifest matches the Host API 1.4 application-window contract", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
   assert.equal(manifest.schemaVersion, 1);
   assert.match(manifest.id, /^[a-z0-9]+(?:[.-][a-z0-9]+)+$/);
   assert.match(manifest.version, /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$/);
-  assert.equal(manifest.compatibility.hostApi, ">=1.3.0 <2.0.0");
+  assert.equal(manifest.compatibility.hostApi, ">=1.4.0 <2.0.0");
   assert.deepEqual(Object.keys(manifest.entrypoints).sort(), ["page", "service"]);
   assert.equal(manifest.entrypoints.page.type, "web");
   assert.equal(manifest.entrypoints.page.bridge, "fantareal.extension.v1");
@@ -26,6 +26,7 @@ test("manifest matches the Host API 1.3 application-window contract", async () =
     "storage.data",
     "storage.assets",
     "files.user-selected.directory-read",
+    "files.user-selected.write",
     "character.context.read",
     "chat.context.read",
     "llm.generate",
@@ -64,6 +65,7 @@ test("manifest requests only foreground generation and storage capabilities thro
   assert.match(serialized, /storage\.data/);
   assert.match(serialized, /storage\.assets/);
   assert.match(serialized, /files\.user-selected\.directory-read/);
+  assert.match(serialized, /files\.user-selected\.write/);
   assert.match(serialized, /character\.context\.read/);
   assert.match(serialized, /chat\.context\.read/);
   assert.match(serialized, /llm\.generate/);

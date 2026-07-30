@@ -38,6 +38,29 @@ test("empty resource pack is valid and contains no bundled assets", async () => 
   assert.match(resourcePack.id, /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/);
   assert.match(resourcePack.version, /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/);
   assert.deepEqual(resourcePack.assets, []);
+  const kindSchema = schema.$defs.asset.properties.kind;
+  assert.deepEqual(kindSchema.oneOf[0].enum, ["sticker", "background"]);
+  assert.equal(kindSchema.oneOf[1].const, "avatar-decoration");
+  assert.equal(kindSchema.oneOf[1].deprecated, true);
+});
+
+test("MC10 appearance, sticker message and backup schemas stay closed", async () => {
+  const appearance = await readJson("schemas/appearance.schema.json");
+  const message = await readJson("schemas/message.schema.json");
+  const backup = await readJson("schemas/mobile-chat-backup.schema.json");
+
+  assert.equal(appearance.additionalProperties, false);
+  assert.deepEqual(appearance.properties.preset.enum, [
+    "modern",
+    "social",
+    "xianxia",
+    "apocalypse",
+  ]);
+  assert.deepEqual(appearance.properties.tone.enum, ["midnight", "mist"]);
+  assert.ok(message.properties.type.enum.includes("sticker"));
+  assert.equal(backup.additionalProperties, false);
+  assert.equal(backup.properties.kind.const, "fantareal.mobile-chat.backup");
+  assert.equal(backup.properties.data.additionalProperties, false);
 });
 
 test("MC5A light apps keep separate closed schemas", async () => {

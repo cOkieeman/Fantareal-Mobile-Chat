@@ -6,7 +6,7 @@
   "version": "0.9.0-rc.2",
   "publisher": "cOkieeman",
   "compatibility": {
-    "hostApi": ">=1.3.0 <2.0.0"
+    "hostApi": ">=1.4.0 <2.0.0"
   },
   "entrypoints": {
     "page": {
@@ -73,6 +73,7 @@
     "storage.data",
     "storage.assets",
     "files.user-selected.directory-read",
+    "files.user-selected.write",
     "character.context.read",
     "chat.context.read",
     "llm.generate"

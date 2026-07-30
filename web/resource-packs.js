@@ -4,8 +4,9 @@
   const KIND_LABELS = Object.freeze({
     sticker: "表情",
     background: "背景",
-    "avatar-decoration": "头像装饰",
+    "avatar-decoration": "头像装饰（已停用）",
   });
+  const ASSET_PAGE_SIZE = 48;
 
   function createController(dependencies) {
     const {
@@ -17,6 +18,8 @@
       isContextFailure,
       syncContext,
       confirmAction,
+      sendSticker,
+      setTheme,
     } = dependencies;
     const byId = (id) => document.getElementById(id);
     const nodes = {
@@ -27,6 +30,12 @@
       stickerList: byId("sticker-library-list"),
       stickerEmpty: byId("sticker-library-empty"),
       stickerCount: byId("sticker-library-count"),
+      loadMoreStickers: byId("load-more-stickers"),
+      backgroundPanel: byId("background-library-panel"),
+      backgroundList: byId("background-library-list"),
+      backgroundEmpty: byId("background-library-empty"),
+      backgroundCount: byId("background-library-count"),
+      loadMoreBackgrounds: byId("load-more-backgrounds"),
       managementPanel: byId("resource-management-panel"),
       list: byId("resource-pack-list"),
       empty: byId("resource-pack-empty"),
@@ -56,15 +65,33 @@
       previewGrid: byId("resource-preview-grid"),
       importError: byId("resource-import-error"),
       confirmImport: byId("confirm-resource-import"),
+      presetButtons: document.querySelectorAll("[data-appearance-preset]"),
+      backgroundName: byId("appearance-background-name"),
+      clearBackground: byId("clear-appearance-background"),
+      stickerPicker: byId("sticker-picker-dialog"),
+      stickerPickerList: byId("sticker-picker-list"),
+      stickerPickerEmpty: byId("sticker-picker-empty"),
+      loadMorePickerStickers: byId("load-more-picker-stickers"),
     };
     const state = {
       context: null,
       packs: [],
+      stickerAssets: [],
+      stickerTotal: 0,
+      backgroundAssets: [],
+      backgroundTotal: 0,
+      appearance: {
+        schemaVersion: 1,
+        preset: "modern",
+        tone: "midnight",
+        background: null,
+      },
       usageBytes: 0,
       quotaBytes: 0,
       preview: null,
       activeTab: "stickers",
       loading: false,
+      assetCache: new Map(),
     };
 
     function sameContext(left, right) {
@@ -102,6 +129,7 @@
         resource_pack_corrupt: "资源包中存在损坏或类型不符的媒体文件。",
         resource_pack_changed: "资源包在预览后发生变化，请重新选择目录。",
         resource_pack_not_found: "资源包已不存在，请刷新列表。",
+        resource_asset_not_found: "资源已不存在或用途不匹配。",
         storage_unavailable: "Host 的资源存储当前不可用。",
         storage_unsafe: "Host 的资源存储包含不安全路径。",
         storage_write_failed: "资源包无法原子写入，请检查磁盘状态后重试。",
@@ -146,6 +174,106 @@
       caption.textContent = String(asset?.alt || asset?.id || "未命名资源");
       figure.append(caption);
       return figure;
+    }
+
+    function assetKey(asset) {
+      return `${asset?.packId || ""}\u0000${asset?.assetId || asset?.id || ""}`;
+    }
+
+    function assetRef(asset) {
+      return {
+        packId: String(asset.packId || ""),
+        assetId: String(asset.assetId || asset.id || ""),
+        alt: String(asset.alt || asset.id || "未命名"),
+      };
+    }
+
+    function rememberAsset(asset) {
+      if (asset?.dataUrl) state.assetCache.set(assetKey(asset), asset);
+      return asset;
+    }
+
+    async function resolveAsset(reference, kind = "sticker") {
+      const key = assetKey(reference);
+      const cached = state.assetCache.get(key);
+      if (cached?.dataUrl) return cached;
+      const result = await invokeService("mobile.resources.asset.get", {
+        context: state.context,
+        packId: reference.packId,
+        assetId: reference.assetId || reference.id,
+        kind,
+      });
+      return rememberAsset(result.asset);
+    }
+
+    function applyAppearance(payload) {
+      const appearance = payload?.appearance || state.appearance;
+      state.appearance = appearance;
+      document.documentElement.dataset.preset = appearance.preset || "modern";
+      setTheme(appearance.tone || "midnight");
+      const backgroundAsset = payload?.backgroundAsset || null;
+      if (backgroundAsset?.dataUrl) {
+        rememberAsset(backgroundAsset);
+        document.documentElement.style.setProperty(
+          "--user-background-image",
+          `url("${backgroundAsset.dataUrl}")`,
+        );
+        document.documentElement.dataset.customBackground = "true";
+      } else {
+        document.documentElement.style.removeProperty("--user-background-image");
+        delete document.documentElement.dataset.customBackground;
+      }
+      for (const button of nodes.presetButtons) {
+        const active = button.dataset.appearancePreset === appearance.preset;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
+      }
+      nodes.backgroundName.textContent = appearance.background?.alt || "默认背景";
+      nodes.clearBackground.disabled = state.loading || !appearance.background;
+      if (payload?.fallback === "background_missing") {
+        setNotice("原背景资源已不存在，已恢复默认背景。", "error");
+      }
+    }
+
+    async function updateAppearance(patch) {
+      if (!state.context || state.loading) return false;
+      state.loading = true;
+      render();
+      try {
+        const result = await invokeService("mobile.appearance.update", {
+          context: state.context,
+          appearance: patch,
+        });
+        applyAppearance(result);
+        setNotice("外观已保存到当前角色。", "success");
+        return true;
+      } catch (error) {
+        setNotice(resourceError(error), "error");
+        if (isContextFailure(error)) await syncContext();
+        return false;
+      } finally {
+        state.loading = false;
+        render();
+      }
+    }
+
+    async function hydrateSticker(message, target) {
+      const reference = message?.sticker;
+      if (!reference || !state.context) return;
+      try {
+        const asset = await resolveAsset(reference, "sticker");
+        if (!target.isConnected) return;
+        const image = document.createElement("img");
+        image.src = asset.dataUrl;
+        image.alt = String(reference.alt || asset.alt || "表情");
+        image.decoding = "async";
+        target.replaceChildren(image);
+        target.classList.remove("is-missing");
+      } catch {
+        if (!target.isConnected) return;
+        target.textContent = `${message.content}（资源已移除）`;
+        target.classList.add("is-missing");
+      }
     }
 
     function renderBoundary() {
@@ -235,37 +363,101 @@
     }
 
     function stickerAssets() {
-      return state.packs.flatMap((pack) => (
-        pack.status === "ready"
-          ? (pack.previewAssets || [])
-            .filter((asset) => asset.kind === "sticker")
-            .map((asset) => ({ ...asset, packName: pack.name || pack.id }))
-          : []
-      ));
+      return state.stickerAssets.filter((asset) => asset.kind === "sticker");
     }
 
     function renderSticker(asset) {
-      const card = document.createElement("article");
+      const card = document.createElement("button");
+      card.type = "button";
       card.className = "sticker-library-card";
       card.append(makePreview(asset));
       const pack = document.createElement("small");
       pack.textContent = String(asset.packName || "表情包");
       card.append(pack);
+      card.disabled = state.loading || !state.context;
+      card.addEventListener("click", async () => {
+        const sent = await sendSticker(assetRef(asset));
+        if (sent && nodes.stickerPicker.open) nodes.stickerPicker.close();
+      });
       return card;
     }
 
+    function renderBackground(asset) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "background-library-card";
+      const selected = (
+        state.appearance.background?.packId === asset.packId
+        && state.appearance.background?.assetId === asset.id
+      );
+      card.classList.toggle("is-selected", selected);
+      card.setAttribute("aria-pressed", String(selected));
+      card.append(makePreview(asset));
+      const copy = document.createElement("span");
+      copy.append(
+        document.createElement("strong"),
+        document.createElement("small"),
+      );
+      copy.firstElementChild.textContent = String(asset.alt || asset.id || "背景");
+      copy.lastElementChild.textContent = String(asset.packName || "背景包");
+      card.append(copy);
+      card.disabled = state.loading || !state.context;
+      card.addEventListener("click", () => void updateAppearance({
+        background: assetRef(asset),
+      }));
+      return card;
+    }
+
+    function renderStickerPicker() {
+      nodes.stickerPickerList.replaceChildren(...state.stickerAssets.map(renderSticker));
+      nodes.stickerPickerList.hidden = state.stickerAssets.length === 0;
+      nodes.stickerPickerEmpty.hidden = state.stickerAssets.length > 0;
+      nodes.loadMorePickerStickers.hidden = (
+        state.stickerAssets.length >= state.stickerTotal
+        || state.stickerAssets.length === 0
+      );
+      nodes.loadMorePickerStickers.disabled = state.loading || !state.context;
+    }
+
+    function openStickerPicker() {
+      if (!state.context) return;
+      renderStickerPicker();
+      nodes.stickerPicker.showModal();
+      nodes.stickerPicker.querySelector("button")?.focus();
+    }
+
     function selectTab(tab) {
-      state.activeTab = tab === "manage" ? "manage" : "stickers";
+      state.activeTab = ["stickers", "backgrounds", "manage"].includes(tab)
+        ? tab
+        : "stickers";
       render();
     }
 
     function render() {
       const stickers = stickerAssets();
+      const backgrounds = state.backgroundAssets;
       nodes.stickerList.replaceChildren(...stickers.map(renderSticker));
-      nodes.stickerCount.textContent = `${stickers.length} 个可预览表情`;
+      nodes.stickerCount.textContent = state.stickerTotal > stickers.length
+        ? `已加载 ${stickers.length} / ${state.stickerTotal} 个表情`
+        : `${stickers.length} 个可发送表情`;
       nodes.stickerEmpty.hidden = stickers.length > 0 || !state.context;
       nodes.stickerList.hidden = stickers.length === 0;
+      nodes.loadMoreStickers.hidden = (
+        stickers.length >= state.stickerTotal
+        || stickers.length === 0
+      );
+      nodes.backgroundList.replaceChildren(...backgrounds.map(renderBackground));
+      nodes.backgroundCount.textContent = state.backgroundTotal > backgrounds.length
+        ? `已加载 ${backgrounds.length} / ${state.backgroundTotal} 个背景`
+        : `${backgrounds.length} 个可用背景`;
+      nodes.backgroundEmpty.hidden = backgrounds.length > 0 || !state.context;
+      nodes.backgroundList.hidden = backgrounds.length === 0;
+      nodes.loadMoreBackgrounds.hidden = (
+        backgrounds.length >= state.backgroundTotal
+        || backgrounds.length === 0
+      );
       nodes.stickerPanel.hidden = state.activeTab !== "stickers";
+      nodes.backgroundPanel.hidden = state.activeTab !== "backgrounds";
       nodes.managementPanel.hidden = state.activeTab !== "manage";
       for (const tab of nodes.tabs) {
         const active = tab.dataset.resourceTab === state.activeTab;
@@ -274,7 +466,7 @@
       }
       nodes.list.replaceChildren(...state.packs.map(renderPack));
       nodes.count.textContent = state.context
-        ? `${stickers.length} 个表情 · ${state.packs.length} 个资源包`
+        ? `${stickers.length} 个表情 · ${backgrounds.length} 个背景 · ${state.packs.length} 个资源包`
         : "等待角色 Context";
       nodes.empty.hidden = state.packs.length > 0 || !state.context;
       nodes.list.hidden = state.packs.length === 0;
@@ -291,6 +483,10 @@
       nodes.importPack.disabled = disabled;
       nodes.importFirst.disabled = disabled;
       nodes.clear.disabled = disabled || state.packs.length === 0;
+      nodes.clearBackground.disabled = disabled || !state.appearance.background;
+      nodes.loadMoreStickers.disabled = disabled;
+      nodes.loadMoreBackgrounds.disabled = disabled;
+      renderStickerPicker();
       renderBoundary();
     }
 
@@ -352,13 +548,84 @@
       state.loading = true;
       render();
       try {
-        const result = await invokeService("mobile.resources.list", {
-          context: state.context,
-        });
+        const [result, stickers, backgrounds, appearance] = await Promise.all([
+          invokeService("mobile.resources.list", {
+            context: state.context,
+          }),
+          invokeService("mobile.resources.assets.list", {
+            context: state.context,
+            kind: "sticker",
+            offset: 0,
+            limit: ASSET_PAGE_SIZE,
+          }),
+          invokeService("mobile.resources.assets.list", {
+            context: state.context,
+            kind: "background",
+            offset: 0,
+            limit: ASSET_PAGE_SIZE,
+          }),
+          invokeService("mobile.appearance.get", {
+            context: state.context,
+          }),
+        ]);
         state.packs = Array.isArray(result.packs) ? result.packs : [];
+        state.stickerAssets = Array.isArray(stickers.assets)
+          ? stickers.assets.map(rememberAsset)
+          : [];
+        state.stickerTotal = Math.max(state.stickerAssets.length, Number(stickers.total) || 0);
+        state.backgroundAssets = Array.isArray(backgrounds.assets)
+          ? backgrounds.assets.map(rememberAsset)
+          : [];
+        state.backgroundTotal = Math.max(
+          state.backgroundAssets.length,
+          Number(backgrounds.total) || 0,
+        );
         state.usageBytes = Number(result.usageBytes) || 0;
         state.quotaBytes = Number(result.quotaBytes) || 0;
+        applyAppearance(appearance);
         if (!quiet) setNotice("已刷新当前角色的资源包。", "success");
+      } catch (error) {
+        setNotice(resourceError(error), "error");
+        if (isContextFailure(error)) await syncContext();
+      } finally {
+        state.loading = false;
+        render();
+      }
+    }
+
+    async function loadMoreAssets(kind) {
+      if (!state.context || state.loading) return;
+      const isSticker = kind === "sticker";
+      const current = isSticker ? state.stickerAssets : state.backgroundAssets;
+      const total = isSticker ? state.stickerTotal : state.backgroundTotal;
+      if (current.length >= total) return;
+      const bound = { ...state.context };
+      state.loading = true;
+      render();
+      try {
+        const result = await invokeService("mobile.resources.assets.list", {
+          context: bound,
+          kind,
+          offset: current.length,
+          limit: ASSET_PAGE_SIZE,
+        });
+        if (!sameContext(state.context, bound)) return;
+        const page = Array.isArray(result.assets)
+          ? result.assets.map(rememberAsset)
+          : [];
+        if (isSticker) {
+          state.stickerAssets.push(...page);
+          state.stickerTotal = Math.max(
+            state.stickerAssets.length,
+            Number(result.total) || 0,
+          );
+        } else {
+          state.backgroundAssets.push(...page);
+          state.backgroundTotal = Math.max(
+            state.backgroundAssets.length,
+            Number(result.total) || 0,
+          );
+        }
       } catch (error) {
         setNotice(resourceError(error), "error");
         if (isContextFailure(error)) await syncContext();
@@ -484,19 +751,39 @@
       state.context = context ? { ...context } : null;
       if (changed) {
         state.packs = [];
+        state.stickerAssets = [];
+        state.stickerTotal = 0;
+        state.backgroundAssets = [];
+        state.backgroundTotal = 0;
         state.usageBytes = 0;
         state.quotaBytes = 0;
         state.preview = null;
+        state.assetCache.clear();
         if (nodes.dialog.open) nodes.dialog.close();
+        if (nodes.stickerPicker.open) nodes.stickerPicker.close();
       }
       if (state.context) await refresh({ quiet: true });
       else render();
     }
 
     nodes.refresh.addEventListener("click", () => void refresh());
+    nodes.loadMoreStickers.addEventListener("click", () => void loadMoreAssets("sticker"));
+    nodes.loadMorePickerStickers.addEventListener("click", () => void loadMoreAssets("sticker"));
+    nodes.loadMoreBackgrounds.addEventListener(
+      "click",
+      () => void loadMoreAssets("background"),
+    );
     nodes.importPack.addEventListener("click", () => void chooseDirectory());
     nodes.importFirst.addEventListener("click", () => void chooseDirectory());
     nodes.clear.addEventListener("click", () => void clearPacks());
+    nodes.clearBackground.addEventListener("click", () => void updateAppearance({
+      background: null,
+    }));
+    for (const button of nodes.presetButtons) {
+      button.addEventListener("click", () => void updateAppearance({
+        preset: button.dataset.appearancePreset,
+      }));
+    }
     nodes.form.addEventListener("submit", (event) => void importPack(event));
     for (const tab of nodes.tabTriggers) {
       tab.addEventListener("click", () => selectTab(tab.dataset.resourceTab));
@@ -507,7 +794,11 @@
 
     render();
     return {
+      isResourceController: true,
       bindContext,
+      hydrateSticker,
+      openStickerPicker,
+      updateAppearance,
       renderGeneration() {
         render();
       },

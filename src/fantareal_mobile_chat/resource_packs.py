@@ -220,6 +220,80 @@ class ResourcePackManager:
         self._remove_tree(root)
         return {"deleted": True, "removedBytes": removed_bytes}
 
+    def get_asset(
+        self,
+        card_uid: str,
+        pack_id: str,
+        asset_id: str,
+        *,
+        expected_kind: str | None = None,
+    ) -> dict[str, Any]:
+        pack = self._scan_pack(self._pack_root(card_uid, self._pack_id(pack_id)))
+        asset = next((item for item in pack.assets if item.asset_id == asset_id), None)
+        if asset is None or (expected_kind is not None and asset.kind != expected_kind):
+            raise DomainError("resource_asset_not_found", "资源已不存在或用途不匹配")
+        payload = self._read_verified_asset(asset)
+        return {
+            **asset.metadata(),
+            "packId": pack.manifest["id"],
+            "packName": pack.manifest["name"],
+            "dataUrl": (
+                f"data:{asset.media_type};base64,"
+                f"{base64.b64encode(payload).decode('ascii')}"
+            ),
+        }
+
+    def list_assets(
+        self,
+        card_uid: str,
+        kind: str,
+        *,
+        offset: int = 0,
+        limit: int = 48,
+    ) -> dict[str, Any]:
+        if kind not in ALLOWED_KINDS:
+            raise DomainError("invalid_params", "资源 kind 无效")
+        if isinstance(offset, bool) or not isinstance(offset, int):
+            raise DomainError("invalid_params", "offset 必须是 integer")
+        if isinstance(limit, bool) or not isinstance(limit, int):
+            raise DomainError("invalid_params", "limit 必须是 integer")
+        assets: list[tuple[ScannedPack, ScannedAsset]] = []
+        root = self._packs_root(card_uid)
+        if root.exists():
+            for entry in sorted(root.iterdir(), key=lambda item: item.name):
+                if entry.name.startswith("."):
+                    continue
+                try:
+                    pack = self._scan_pack(entry)
+                except DomainError:
+                    continue
+                assets.extend(
+                    (pack, asset) for asset in pack.assets if asset.kind == kind
+                )
+        safe_offset = max(0, offset)
+        safe_limit = min(96, max(1, limit))
+        page = []
+        for pack, asset in assets[safe_offset : safe_offset + safe_limit]:
+            item = {
+                **asset.metadata(),
+                "packId": pack.manifest["id"],
+                "packName": pack.manifest["name"],
+            }
+            if asset.size_bytes <= MAX_INLINE_BYTES:
+                payload = self._read_verified_asset(asset)
+                item["dataUrl"] = (
+                    f"data:{asset.media_type};base64,"
+                    f"{base64.b64encode(payload).decode('ascii')}"
+                )
+            page.append(item)
+        return {
+            "kind": kind,
+            "offset": safe_offset,
+            "limit": safe_limit,
+            "total": len(assets),
+            "assets": page,
+        }
+
     def _scan_pack(self, root: Path) -> ScannedPack:
         if not root.is_dir() or is_link_or_reparse(root):
             raise DomainError("resource_pack_unsafe", "资源包根目录不是普通目录")

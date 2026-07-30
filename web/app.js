@@ -29,6 +29,7 @@
     composerForm: byId("composer-form"),
     messageInput: byId("message-input"),
     continueChat: byId("continue-chat"),
+    openStickerPicker: byId("open-sticker-picker"),
     sendMessage: byId("send-message"),
     stopGeneration: byId("stop-generation"),
     createGroup: byId("create-group"),
@@ -50,6 +51,9 @@
     importForm: byId("import-form"),
     importSummary: byId("import-summary"),
     importFormError: byId("import-form-error"),
+    exportMobileData: byId("export-mobile-data"),
+    restoreMobileData: byId("restore-mobile-data"),
+    resetMobileData: byId("reset-mobile-data"),
     confirmDialog: byId("confirm-dialog"),
     confirmTitle: byId("confirm-title"),
     confirmMessage: byId("confirm-message"),
@@ -115,6 +119,13 @@
       chat_context_changed: "当前角色或主会话已变化，正在重新载入。",
       permission_denied: "小手机缺少所需权限，请重新安装并确认授权。",
       service_permission_denied: "小手机数据服务缺少所需权限。",
+      service_backup_invalid: "所选目录中的备份无效，或不属于当前角色。",
+      service_backup_changed: "备份在预览后发生变化，请重新选择。",
+      file_save_request_invalid: "备份文件参数无效，请更新主程序和小手机插件。",
+      file_save_too_large: "当前角色的备份超过 Host 单文件保存限制。",
+      file_save_target_invalid: "所选保存位置无效，请重新选择。",
+      file_save_failed: "Host 无法写入所选位置，请检查目录权限后重试。",
+      file_picker_busy: "已有文件选择窗口正在使用，请完成或取消后重试。",
     };
     const message = known[code] || String(error?.message || error || "操作失败");
     const detail = String(error?.message || "").trim();
@@ -130,6 +141,10 @@
 
   function generationBusy() {
     return state.generation !== null;
+  }
+
+  function resourceController() {
+    return featureControllers.find((controller) => controller.isResourceController) || null;
   }
 
   function ownsGeneration(owner) {
@@ -348,7 +363,13 @@
         makeElement("span", "", outgoing ? "你" : message.speakerName),
         makeElement("time", "", formatMessageTime(message.createdAt)),
       );
-      item.append(meta, makeElement("p", "", message.content));
+      if (message.type === "sticker") {
+        const sticker = makeElement("div", "message-sticker is-missing", message.content);
+        item.append(meta, sticker);
+        void resourceController()?.hydrateSticker(message, sticker);
+      } else {
+        item.append(meta, makeElement("p", "", message.content));
+      }
       if (outgoing) item.append(makeElement("small", "", "✓✓"));
       elements.messageList.append(item);
     }
@@ -372,6 +393,7 @@
     elements.clearMessages.disabled = !state.ready || busy || !hasGroup || state.messages.length === 0;
     elements.messageInput.disabled = !state.ready || busy || !hasGroup;
     elements.continueChat.disabled = !state.ready || busy || !hasGroup;
+    elements.openStickerPicker.disabled = !state.ready || busy || !hasGroup;
     elements.sendMessage.disabled = !state.ready || busy || !hasGroup || !elements.messageInput.value.trim();
     elements.stopGeneration.hidden = !ownsGeneration("chat");
     elements.sendMessage.hidden = ownsGeneration("chat");
@@ -435,6 +457,9 @@
     elements.createGroup.disabled = !state.ready || busy;
     elements.createFirstGroup.disabled = !state.ready || busy;
     elements.importGroups.disabled = !state.ready || busy;
+    elements.exportMobileData.disabled = !state.ready || busy;
+    elements.restoreMobileData.disabled = !state.ready || busy;
+    elements.resetMobileData.disabled = !state.ready || busy;
     renderHomeBoundary();
     renderGroups();
     renderConversation();
@@ -918,6 +943,122 @@
     }
   }
 
+  async function restoreMobileData() {
+    if (!state.ready || generationBusy() || !state.context) return;
+    if (!host || typeof host.pickDirectory !== "function") {
+      setNotice("当前 Host 不支持目录选择。", "error");
+      return;
+    }
+    try {
+      setNotice("请选择包含 mobile-chat-backup.json 的目录…");
+      const picked = await host.pickDirectory();
+      const directoryToken = String(picked?.directoryToken || "");
+      if (!directoryToken) throw new Error("Host 未返回有效目录授权");
+      const preview = await invokeService("mobile.data.restore.preview", {
+        context: state.context,
+        directoryToken,
+      });
+      const confirmed = await askForConfirmation(
+        "恢复当前角色备份？",
+        `将用备份中的 ${preview.groupCount} 个群聊、${preview.messageCount} 条消息和 ${preview.lightAppItemCount} 条轻应用数据替换当前角色数据。已导入资源包不会被删除。`,
+        "恢复备份",
+      );
+      if (!confirmed) {
+        setNotice("已取消恢复。");
+        return;
+      }
+      await invokeService("mobile.data.restore.apply", {
+        context: state.context,
+        directoryToken,
+        contentDigest: preview.contentDigest,
+      });
+      await syncContext();
+      setNotice("当前角色的小手机数据已恢复。", "success");
+    } catch (error) {
+      if (["file_selection_cancelled", "directory_selection_cancelled"].includes(errorCode(error))) {
+        setNotice("已取消目录选择。");
+      } else {
+        setNotice(errorMessage(error), "error");
+      }
+      if (isContextFailure(error)) await syncContext();
+    }
+  }
+
+  async function exportMobileData() {
+    if (!state.ready || generationBusy() || !state.context) return;
+    if (!host || typeof host.saveFile !== "function") {
+      setNotice("当前 Host 不支持安全保存文件，请先更新主程序。", "error");
+      return;
+    }
+    try {
+      setNotice("正在整理当前角色的小手机备份…");
+      const result = await invokeService("mobile.data.export", {
+        context: state.context,
+      });
+      const backup = result?.backup;
+      if (!backup || backup.kind !== "fantareal.mobile-chat.backup") {
+        const error = new Error("服务未返回有效备份对象");
+        error.code = "service_backup_invalid";
+        throw error;
+      }
+      const saved = await host.saveFile({
+        suggestedName: "mobile-chat-backup.json",
+        mediaType: "application/json",
+        content: `${JSON.stringify(backup, null, 2)}\n`,
+      });
+      if (saved?.cancelled) {
+        setNotice("已取消导出备份。");
+        return;
+      }
+      const savedName = String(saved?.name || "");
+      if (!savedName || !Number.isFinite(Number(saved?.size))) {
+        throw new Error("Host 未返回有效保存结果");
+      }
+      setNotice(`备份已保存：${savedName}`, "success");
+    } catch (error) {
+      setNotice(errorMessage(error), "error");
+      if (isContextFailure(error)) await syncContext();
+    }
+  }
+
+  async function resetMobileData() {
+    if (!state.ready || generationBusy() || !state.context) return;
+    const confirmed = await askForConfirmation(
+      "重置当前角色的小手机？",
+      "将清空群聊、消息、轻应用、通知、Prompt 配置和外观选择；已导入资源包会保留。此操作无法撤销。",
+      "确认重置",
+    );
+    if (!confirmed) return;
+    try {
+      await invokeService("mobile.data.reset", { context: state.context });
+      await syncContext();
+      setNotice("当前角色的小手机数据已重置；资源包已保留。", "success");
+    } catch (error) {
+      setNotice(errorMessage(error), "error");
+      if (isContextFailure(error)) await syncContext();
+    }
+  }
+
+  async function sendSticker(sticker) {
+    const group = activeGroup();
+    if (!state.ready || generationBusy() || !group || !state.context) return false;
+    try {
+      await invokeService("mobile.messages.sticker.create", {
+        context: state.context,
+        groupId: group.groupId,
+        sticker,
+      });
+      await refreshGroups(group.groupId);
+      setNotice(`已发送表情“${sticker.alt || "未命名"}”`, "success");
+      render();
+      return true;
+    } catch (error) {
+      setNotice(errorMessage(error), "error");
+      if (isContextFailure(error)) await syncContext();
+      return false;
+    }
+  }
+
   async function stopGeneration() {
     if (!generationCoordinator.requestCancel("chat")) return;
     try {
@@ -939,7 +1080,10 @@
     void requestPresentation(state.presentation === "compact" ? "expanded" : "compact");
   });
   elements.themeToggle.addEventListener("click", () => {
-    setTheme(root.dataset.theme === "mist" ? "midnight" : "mist");
+    const tone = root.dataset.theme === "mist" ? "midnight" : "mist";
+    const controller = resourceController();
+    if (controller) void controller.updateAppearance({ tone });
+    else setTheme(tone);
   });
   byId("close-extension").addEventListener("click", async () => {
     if (generationBusy()) {
@@ -966,6 +1110,9 @@
   elements.clearMessages.addEventListener("click", () => void clearCurrentMessages());
   elements.importGroups.addEventListener("click", () => void chooseImportDirectory());
   elements.importForm.addEventListener("submit", (event) => void applyImport(event));
+  elements.exportMobileData.addEventListener("click", () => void exportMobileData());
+  elements.restoreMobileData.addEventListener("click", () => void restoreMobileData());
+  elements.resetMobileData.addEventListener("click", () => void resetMobileData());
 
   elements.messageInput.addEventListener("input", resizeComposer);
   elements.messageInput.addEventListener("keydown", (event) => {
@@ -983,6 +1130,9 @@
     void runGeneration("user_message", content);
   });
   elements.continueChat.addEventListener("click", () => void runGeneration("continue"));
+  elements.openStickerPicker.addEventListener("click", () => {
+    resourceController()?.openStickerPicker();
+  });
   elements.stopGeneration.addEventListener("click", () => void stopGeneration());
   elements.retryGeneration.addEventListener("click", () => {
     if (state.retry) void runGeneration(state.retry.mode, state.retry.content);
@@ -1004,6 +1154,8 @@
     openScreen: showScreen,
     confirmAction: askForConfirmation,
     generation: generationCoordinator,
+    sendSticker,
+    setTheme,
     host,
   };
   featureControllers = [
